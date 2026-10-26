@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin · Cooperativa</title>
+<style>
+:root{--bg:#f3f6f2;--card:#fff;--fg:#14231b;--mut:#587061;--line:#cfdcd2;--ac:#0d7a55;--bad:#c93d3d}
+@media(prefers-color-scheme:dark){:root{--bg:#0c1511;--card:#13201a;--fg:#e6f2ea;--mut:#93aa9b;--line:#264034;--ac:#3fd49b}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--fg)}
+header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:0;z-index:2}
+h1{font-size:18px;margin:0}main{max-width:1000px;margin:0 auto;padding:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+input,textarea{width:100%;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+textarea{min-height:70px;resize:vertical}label{display:block;font-size:12px;font-weight:600;color:var(--mut);margin:10px 0 3px;text-transform:uppercase;letter-spacing:.04em}
+button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;background:var(--ac);color:#fff}
+button.sec{background:transparent;color:var(--fg);border:1px solid var(--line)}button.del{background:var(--bad)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}.tabs button{background:var(--card);color:var(--fg);border:1px solid var(--line)}.tabs button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sub{margin:10px 0 0 14px;padding-left:12px;border-left:3px solid var(--line)}
+.item{border:1px dashed var(--line);border-radius:10px;padding:10px;margin:8px 0}
+#msg{position:fixed;bottom:16px;right:16px;background:var(--ac);color:#fff;padding:10px 16px;border-radius:10px;display:none}
+.mut{color:var(--mut);font-size:13px}.unread{border-left:4px solid var(--ac)}
+</style></head><body>
+<header><h1>Panel admin · Cooperativa</h1><div class="row"><a class="mut" href="/" target="_blank">Ver sitio público ↗</a><button class="sec" id="out" hidden>Salir</button></div></header>
+<main id="app"></main><div id="msg"></div>
+<script>
+const API=location.origin;let token=sessionStorage.getItem('tk')||'',sections=[],cur=null,view='sections';
+const $=s=>document.querySelector(s),el=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a))x.startsWith('on')?e[x]=v:e.setAttribute(x,v);k.flat().forEach(c=>e.append(c));return e};
+function toast(t,bad){const m=$('#msg');m.textContent=t;m.style.background=bad?'var(--bad)':'var(--ac)';m.style.display='block';setTimeout(()=>m.style.display='none',2200)}
+async function api(p,o={}){const h={...(o.body&&!(o.body instanceof FormData)?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})};
+ const r=await fetch(API+p,{...o,headers:h});if(r.status===401&&token){logout();throw new Error('Sesión vencida')}
+ if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(typeof j.detail==='string'?j.detail:'Error '+r.status)}return r.status===204?null:r.json()}
+function logout(){token='';sessionStorage.removeItem('tk');$('#out').hidden=true;login()}
+$('#out').onclick=logout;
+function login(){const app=$('#app');app.innerHTML='';
+ const e=el('input',{id:'e',type:'email',value:'admin@cooperativa.com'}),p=el('input',{id:'p',type:'password'});
+ const go=async()=>{try{const r=await api('/api/admin/login',{method:'POST',body:JSON.stringify({email:e.value,password:p.value})});token=r.access_token;sessionStorage.setItem('tk',token);start()}catch(x){toast(x.message,1)}};
+ p.onkeydown=ev=>ev.key==='Enter'&&go();
+ app.append(el('div',{class:'card',style:'max-width:380px;margin:60px auto'},el('h2',{},'Iniciar sesión'),el('label',{for:'e'},'Correo'),e,el('label',{for:'p'},'Contraseña'),p,el('br'),el('button',{onclick:go},'Entrar')))}
+async function start(){$('#out').hidden=false;try{sections=await api('/api/admin/sections');cur=cur&&sections.find(s=>s.key===cur.key)||sections[0];draw()}catch(x){toast(x.message,1)}}
+function draw(){const app=$('#app');app.innerHTML='';
+ const tabs=el('div',{class:'tabs'},sections.map(s=>el('button',{class:view==='sections'&&cur&&cur.key===s.key?'on':'',onclick:()=>{view='sections';cur=s;draw()}},s.title+(s.visible?'':' (oculta)'))),el('button',{class:view==='contacts'?'on':'',onclick:()=>{view='contacts';draw()}},'✉ Mensajes'));
+ app.append(tabs);view==='contacts'?drawContacts():drawSection()}
+const isImg=k=>/(image|logo|photo)_url$/.test(k);
+function field(obj,k,path){const v=obj[k],lab=el('label',{},k);
+ if(typeof v==='string'){const long=v.length>70||/text|answer|mission|vision/.test(k);const i=el(long?'textarea':'input',{});i.value=v;i.oninput=()=>obj[k]=i.value;
+  const w=el('div',{},lab,i);
+  if(isImg(k)){const prev=el('img',{style:'max-height:80px;display:block;margin-top:6px',src:v?(v.startsWith('/')?API+v:v):''});if(!v)prev.hidden=true;
+   const f=el('input',{type:'file',accept:'image/png,image/jpeg,image/webp',style:'margin-top:6px'});
+   f.onchange=async()=>{const fd=new FormData();fd.append('file',f.files[0]);try{const r=await api('/api/admin/upload',{method:'POST',body:fd});obj[k]=r.url;i.value=r.url;prev.src=API+r.url;prev.hidden=false;toast('Imagen subida')}catch(x){toast(x.message,1)}};w.append(prev,f)}
+  return w}
+ if(typeof v==='boolean'){const c=el('input',{type:'checkbox',style:'width:auto'});c.checked=v;c.onchange=()=>obj[k]=c.checked;return el('div',{},lab,c)}
+ if(typeof v==='number'){const i=el('input',{type:'number'});i.value=v;i.oninput=()=>obj[k]=Number(i.value);return el('div',{},lab,i)}
+ if(Array.isArray(v)){const box=el('div',{class:'sub'});const paint=()=>{box.innerHTML='';v.forEach((it,n)=>{const d=el('div',{class:'item'});
+   if(typeof it==='object'&&it)Object.keys(it).forEach(kk=>d.append(field(it,kk)));else{const i=el('input',{});i.value=it;i.oninput=()=>v[n]=i.value;d.append(i)}
+   d.append(el('div',{class:'row',style:'margin-top:8px'},el('button',{class:'sec',onclick:()=>{if(n>0){[v[n-1],v[n]]=[v[n],v[n-1]];paint()}}},'↑'),el('button',{class:'sec',onclick:()=>{if(n<v.length-1){[v[n+1],v[n]]=[v[n],v[n+1]];paint()}}},'↓'),el('button',{class:'del',onclick:()=>{v.splice(n,1);paint()}},'Quitar')));box.append(d)});
+   box.append(el('button',{class:'sec',onclick:()=>{const t=v[0];v.push(t&&typeof t==='object'?Object.fromEntries(Object.keys(t).map(q=>[q,typeof t[q]==='string'?'':t[q]])):'');paint()}},'+ Agregar'))};paint();return el('div',{},lab,box)}
+ if(v&&typeof v==='object'){const box=el('div',{class:'sub'});Object.keys(v).forEach(kk=>box.append(field(v,kk)));return el('div',{},lab,box)}
+ return el('div')}
+function drawSection(){const s=cur;if(!s)return;const draft=JSON.parse(JSON.stringify(s.content));
+ const card=el('div',{class:'card'});const vis=el('input',{type:'checkbox',style:'width:auto'});vis.checked=s.visible;
+ const title=el('input',{});title.value=s.title;const pos=el('input',{type:'number',style:'width:90px'});pos.value=s.position;
+ card.append(el('div',{class:'row'},el('div',{style:'flex:1;min-width:200px'},el('label',{},'Nombre en el panel'),title),el('div',{},el('label',{},'Orden'),pos),el('div',{},el('label',{},'Visible'),vis)));
+ Object.keys(draft).forEach(k=>card.append(field(draft,k)));
+ card.append(el('br'),el('button',{onclick:async()=>{try{const r=await api('/api/admin/sections/'+s.key,{method:'PUT',body:JSON.stringify({title:title.value,content:draft,visible:vis.checked,position:Number(pos.value)})});Object.assign(s,r);toast('Guardado: ya lo ven los visitantes');draw()}catch(x){toast(x.message,1)}}},'Guardar y publicar'));
+ $('#app').append(card)}
+async function drawContacts(){const list=await api('/api/admin/contacts').catch(x=>(toast(x.message,1),[]));const w=el('div');
+ if(!list.length)w.append(el('p',{class:'mut'},'No hay mensajes todavía.'));
+ list.forEach(c=>w.append(el('div',{class:'card'+(c.read?'':' unread')},el('b',{},c.name),' ',el('span',{class:'mut'},c.email+(c.phone?' · '+c.phone:'')+' · '+new Date(c.created_at).toLocaleString()),el('p',{},c.message),el('div',{class:'row'},c.read?'':el('button',{onclick:async()=>{await api('/api/admin/contacts/'+c.id+'/read',{method:'PATCH'});draw()}},'Marcar leído'),el('button',{class:'del',onclick:async()=>{await api('/api/admin/contacts/'+c.id,{method:'DELETE'});draw()}},'Borrar')))));
+ $('#app').append(w)}
+token?start():login();
+</script></body></html>

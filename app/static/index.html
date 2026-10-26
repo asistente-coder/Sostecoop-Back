@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cooperativa de Ahorro</title>
+<style>
+:root{--bg:#f3f6f2;--card:#fff;--fg:#14231b;--mut:#587061;--line:#cfdcd2;--ac:#0d7a55}
+@media(prefers-color-scheme:dark){:root{--bg:#0c1511;--card:#13201a;--fg:#e6f2ea;--mut:#93aa9b;--line:#264034;--ac:#3fd49b}}
+*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--fg)}
+section{max-width:960px;margin:0 auto;padding:48px 20px;border-bottom:1px solid var(--line);transition:background .6s}
+section.flash{background:color-mix(in srgb,var(--ac) 18%,transparent)}
+h2{font-size:clamp(1.6rem,4vw,2.4rem);margin:0 0 10px}p{color:var(--mut);margin:6px 0}img{max-width:100%;border-radius:12px;margin-top:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card b{display:block}.cta{display:inline-block;margin-top:14px;background:var(--ac);color:#fff;padding:10px 20px;border-radius:99px;text-decoration:none;font-weight:600}
+nav{position:sticky;top:0;background:var(--card);border-bottom:1px solid var(--line);padding:12px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}nav b{margin-right:auto}nav a{color:var(--fg);text-decoration:none}
+form{display:grid;gap:10px;max-width:480px;margin-top:16px}input,textarea{font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+button{font:inherit;font-weight:600;background:var(--ac);color:#fff;border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+#dot{position:fixed;right:12px;bottom:12px;font-size:12px;color:var(--mut)}
+</style></head><body>
+<nav id="nav"><b>Cooperativa</b></nav><div id="root"></div><div id="dot">● conectando…</div>
+<script>
+const API=location.origin,WS=API.replace(/^http/,'ws')+'/api/public/ws';let S={};
+const img=u=>u?(u.startsWith('/')?API+u:u):'';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function items(arr){return arr&&arr.length?'<div class="grid">'+arr.map(i=>'<div class="card">'+Object.entries(i).map(([k,v])=>isImg(k)?(v?'<img src="'+esc(img(v))+'" alt="">':''):(k==='title'||k==='name'||k==='question'?'<b>'+esc(v)+'</b>':(k==='icon'?'':'<p>'+esc(v)+'</p>'))).join('')+'</div>').join('')+'</div>':''}
+const isImg=k=>/(image|logo|photo)_url$/.test(k);
+function body(s){const c=s.content;let h='<h2>'+esc(c.title||s.title)+'</h2>';
+ for(const[k,v]of Object.entries(c)){if(k==='title'||Array.isArray(v)||(v&&typeof v==='object'))continue;if(isImg(k)){if(v)h+='<img src="'+esc(img(v))+'" alt="">'}else if(k==='cta_anchor'||k==='map_url'||k==='cta_label'){}else if(v)h+='<p>'+esc(v)+'</p>'}
+ if(c.cta_label)h+='<a class="cta" href="'+esc(c.cta_anchor||'#')+'">'+esc(c.cta_label)+'</a>';
+ if(c.items)h+=items(c.items);
+ if(s.key==='contacto')h+='<form id="cf"><input name="name" placeholder="Nombre" required minlength="2"><input name="email" type="email" placeholder="Correo" required><input name="phone" placeholder="Teléfono (opcional)"><textarea name="message" placeholder="Mensaje" required minlength="5"></textarea><button>Enviar</button><p id="cm"></p></form>';
+ return h}
+function render(flashKey){const list=Object.values(S).filter(s=>s.key!=='settings').sort((a,b)=>a.position-b.position);
+ const st=S.settings&&S.settings.content;
+ document.getElementById('nav').innerHTML='<b>'+esc(st?st.site_name:'Cooperativa')+'</b>'+((st&&st.menu)||[]).map(m=>'<a href="'+esc(m.anchor)+'">'+esc(m.label)+'</a>').join('');
+ document.getElementById('root').innerHTML=list.map(s=>'<section id="'+s.key+'" data-k="'+s.key+'">'+body(s)+'</section>').join('')+(st?'<section><p>'+esc(st.footer_text)+'</p></section>':'');
+ if(flashKey){const e=document.querySelector('[data-k="'+flashKey+'"]');if(e){e.classList.add('flash');setTimeout(()=>e.classList.remove('flash'),1200)}}
+ const f=document.getElementById('cf');if(f)f.onsubmit=async ev=>{ev.preventDefault();const d=Object.fromEntries(new FormData(f));if(!d.phone)delete d.phone;
+  const r=await fetch(API+'/api/public/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  document.getElementById('cm').textContent=r.ok?'¡Mensaje enviado!':'Revisa los datos del formulario';if(r.ok)f.reset()}}
+async function load(){const l=await (await fetch(API+'/api/public/content')).json();S=Object.fromEntries(l.map(s=>[s.key,s]));render()}
+let retry=0,ping;function connect(){const ws=new WebSocket(WS),dot=document.getElementById('dot');
+ ws.onopen=()=>{retry=0;dot.textContent='● en vivo';load();ping=setInterval(()=>ws.send('ping'),30000)};
+ ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.event==='section_updated'){if(m.data.visible)S[m.data.key]=m.data;else delete S[m.data.key];render(m.data.key)}};
+ ws.onclose=()=>{clearInterval(ping);dot.textContent='● reconectando…';setTimeout(connect,Math.min(1000*2**retry++,15000))}}
+load();connect();
+</script></body></html>
