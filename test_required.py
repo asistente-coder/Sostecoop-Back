@@ -1,4 +1,5 @@
 """Secciones obligatorias. Usa base temporal: DATABASE_URL=sqlite:///./test_tmp.db python test_required.py"""
+
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
@@ -15,7 +16,10 @@ def public_keys(c):
 
 with TestClient(app) as c:
     c.headers["Origin"] = "http://localhost:3000"
-    assert c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).status_code == 200
+    assert (
+        c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).status_code
+        == 200
+    )
     h = {}  # la sesión va en la cookie
 
     for k in REQUIRED_KEYS:

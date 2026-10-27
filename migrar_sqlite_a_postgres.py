@@ -6,6 +6,7 @@ Uso (con .env ya apuntando a PostgreSQL):
 
 No borra nada: se detiene si la base de destino ya tiene secciones.
 """
+
 import sys
 
 from sqlalchemy import create_engine, text
@@ -38,9 +39,9 @@ with Session(src_engine) as src, Session(engine) as dst:
     dst.flush()
     # Los ids se copiaron tal cual: alinea los contadores automáticos de PostgreSQL
     for tabla in ("admins", "contact_messages"):
-        dst.execute(text(
-            f"SELECT setval(pg_get_serial_sequence('{tabla}', 'id'), COALESCE((SELECT MAX(id) FROM {tabla}), 1))"
-        ))
+        dst.execute(
+            text(f"SELECT setval(pg_get_serial_sequence('{tabla}', 'id'), COALESCE((SELECT MAX(id) FROM {tabla}), 1))")
+        )
     dst.commit()
 
 print("Listo: datos copiados a", engine.url.render_as_string(hide_password=True))

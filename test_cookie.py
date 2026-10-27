@@ -1,4 +1,5 @@
 """Sesión por cookie, CSRF y CORS. Usa base temporal: DATABASE_URL=sqlite:///./test_tmp.db python test_cookie.py"""
+
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -38,13 +39,22 @@ finally:
 # --- /me ---
 assert c.get("/api/admin/me").json() == {"email": CRED["email"]}
 assert new_client().get("/api/admin/me").status_code == 401
-bad = new_client(); bad.cookies.set("sostecoop_admin", "basura")
+bad = new_client()
+bad.cookies.set("sostecoop_admin", "basura")
 assert bad.get("/api/admin/me").status_code == 401
-old = jwt.encode({"sub": CRED["email"], "exp": datetime.now(timezone.utc) - timedelta(minutes=1)}, settings.secret_key, algorithm="HS256")
-exp = new_client(); exp.cookies.set("sostecoop_admin", old)
+old = jwt.encode(
+    {"sub": CRED["email"], "exp": datetime.now(timezone.utc) - timedelta(minutes=1)},
+    settings.secret_key,
+    algorithm="HS256",
+)
+exp = new_client()
+exp.cookies.set("sostecoop_admin", old)
 assert exp.get("/api/admin/me").status_code == 401
 # el header Authorization ya no sirve
-assert new_client().get("/api/admin/me", headers={"Authorization": f"Bearer {create_token(CRED['email'])}"}).status_code == 401
+assert (
+    new_client().get("/api/admin/me", headers={"Authorization": f"Bearer {create_token(CRED['email'])}"}).status_code
+    == 401
+)
 
 # --- CSRF: solo en solicitudes que cambian datos ---
 body = {"content": {"title": "CSRF"}}
@@ -53,10 +63,16 @@ assert c.post("/api/admin/logout", headers={"Origin": "null"}).status_code == 40
 sin_origen = TestClient(app, cookies=c.cookies)  # sin Origin ni Referer
 assert sin_origen.put("/api/admin/sections/hero", json=body).status_code == 403
 assert sin_origen.put("/api/admin/sections/hero", json=body, headers={"Referer": OK + "/admin"}).status_code == 200
-assert sin_origen.put("/api/admin/sections/hero", json=body, headers={"Referer": "http://evil.com/x"}).status_code == 403
-assert sin_origen.put("/api/admin/sections/hero", json=body, headers={"Origin": "http://testserver"}).status_code == 200  # mismo host (/admin)
+assert (
+    sin_origen.put("/api/admin/sections/hero", json=body, headers={"Referer": "http://evil.com/x"}).status_code == 403
+)
+assert (
+    sin_origen.put("/api/admin/sections/hero", json=body, headers={"Origin": "http://testserver"}).status_code == 200
+)  # mismo host (/admin)
 assert c.put("/api/admin/sections/hero", json=body).status_code == 200  # origen listado
-assert c.get("/api/admin/sections", headers={"Origin": "http://evil.com"}).status_code == 200  # lectura: la bloquea CORS
+assert (
+    c.get("/api/admin/sections", headers={"Origin": "http://evil.com"}).status_code == 200
+)  # lectura: la bloquea CORS
 
 # --- CORS con credenciales ---
 pre = {"Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "content-type"}
@@ -72,6 +88,12 @@ assert r.headers["access-control-allow-origin"] == OK and r.headers["access-cont
 r = c.post("/api/admin/logout")
 assert r.status_code == 204
 sc = r.headers["set-cookie"].lower()
-assert sc.startswith("sostecoop_admin=") and "max-age=0" in sc and "path=/" in sc and "httponly" in sc and "samesite=lax" in sc, sc
+assert (
+    sc.startswith("sostecoop_admin=")
+    and "max-age=0" in sc
+    and "path=/" in sc
+    and "httponly" in sc
+    and "samesite=lax" in sc
+), sc
 assert c.get("/api/admin/me").status_code == 401
 print("COOKIE OK")

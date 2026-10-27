@@ -9,61 +9,93 @@ from .security import hash_password
 
 # Contenido inicial. Ajustar las llaves a lo que muestre el diseño de Figma.
 DEFAULT_SECTIONS = [
-    ("settings", "Ajustes generales", {
-        "site_name": "Cooperativa de Ahorro",
-        "logo_url": "",
-        "menu": [
-            {"label": "Inicio", "anchor": "#inicio"},
-            {"label": "Nosotros", "anchor": "#nosotros"},
-            {"label": "Servicios", "anchor": "#servicios"},
-            {"label": "Contacto", "anchor": "#contacto"},
-        ],
-        "footer_text": "© Cooperativa de Ahorro. Todos los derechos reservados.",
-        "social": {"facebook": "", "instagram": "", "whatsapp": ""},
-    }),
-    ("hero", "Inicio", {
-        "title": "Ahorra junto a tu cooperativa",
-        "subtitle": "Crece con nosotros de forma segura y solidaria.",
-        "cta_label": "Contáctanos",
-        "cta_anchor": "#contacto",
-        "image_url": "",
-    }),
-    ("nosotros", "Nosotros", {
-        "title": "Quiénes somos",
-        "text": "Somos una cooperativa creada por y para sus asociados.",
-        "mission": "",
-        "vision": "",
-        "image_url": "",
-    }),
-    ("servicios", "Servicios", {
-        "title": "Nuestros servicios",
-        "items": [
-            {"icon": "piggy-bank", "title": "Ahorro programado", "text": "Ahorra de forma constante."},
-            {"icon": "hand-coins", "title": "Créditos", "text": "Tasas justas para asociados."},
-        ],
-    }),
-    ("beneficios", "Beneficios", {
-        "title": "Por qué elegirnos",
-        "items": [{"title": "Transparencia", "text": "Cuentas claras."}],
-    }),
+    (
+        "settings",
+        "Ajustes generales",
+        {
+            "site_name": "Cooperativa de Ahorro",
+            "logo_url": "",
+            "menu": [
+                {"label": "Inicio", "anchor": "#inicio"},
+                {"label": "Nosotros", "anchor": "#nosotros"},
+                {"label": "Servicios", "anchor": "#servicios"},
+                {"label": "Contacto", "anchor": "#contacto"},
+            ],
+            "footer_text": "© Cooperativa de Ahorro. Todos los derechos reservados.",
+            "social": {"facebook": "", "instagram": "", "whatsapp": ""},
+        },
+    ),
+    (
+        "hero",
+        "Inicio",
+        {
+            "title": "Ahorra junto a tu cooperativa",
+            "subtitle": "Crece con nosotros de forma segura y solidaria.",
+            "cta_label": "Contáctanos",
+            "cta_anchor": "#contacto",
+            "image_url": "",
+        },
+    ),
+    (
+        "nosotros",
+        "Nosotros",
+        {
+            "title": "Quiénes somos",
+            "text": "Somos una cooperativa creada por y para sus asociados.",
+            "mission": "",
+            "vision": "",
+            "image_url": "",
+        },
+    ),
+    (
+        "servicios",
+        "Servicios",
+        {
+            "title": "Nuestros servicios",
+            "items": [
+                {"icon": "piggy-bank", "title": "Ahorro programado", "text": "Ahorra de forma constante."},
+                {"icon": "hand-coins", "title": "Créditos", "text": "Tasas justas para asociados."},
+            ],
+        },
+    ),
+    (
+        "beneficios",
+        "Beneficios",
+        {
+            "title": "Por qué elegirnos",
+            "items": [{"title": "Transparencia", "text": "Cuentas claras."}],
+        },
+    ),
     ("noticias", "Noticias", json.loads((Path(__file__).parent / "noticias_seed.json").read_text(encoding="utf-8"))),
-    ("testimonios", "Testimonios", {
-        "title": "Lo que dicen nuestros asociados",
-        "items": [{"name": "Asociado", "text": "Excelente servicio.", "photo_url": ""}],
-    }),
-    ("faq", "Preguntas frecuentes", {
-        "title": "Preguntas frecuentes",
-        "items": [{"question": "¿Cómo me asocio?", "answer": "Escríbenos desde el formulario de contacto."}],
-    }),
-    ("contacto", "Contacto", {
-        "title": "Contáctanos",
-        "subtitle": "Te respondemos lo antes posible.",
-        "address": "",
-        "phone": "",
-        "email": "",
-        "schedule": "",
-        "map_url": "",
-    }),
+    (
+        "testimonios",
+        "Testimonios",
+        {
+            "title": "Lo que dicen nuestros asociados",
+            "items": [{"name": "Asociado", "text": "Excelente servicio.", "photo_url": ""}],
+        },
+    ),
+    (
+        "faq",
+        "Preguntas frecuentes",
+        {
+            "title": "Preguntas frecuentes",
+            "items": [{"question": "¿Cómo me asocio?", "answer": "Escríbenos desde el formulario de contacto."}],
+        },
+    ),
+    (
+        "contacto",
+        "Contacto",
+        {
+            "title": "Contáctanos",
+            "subtitle": "Te respondemos lo antes posible.",
+            "address": "",
+            "phone": "",
+            "email": "",
+            "schedule": "",
+            "map_url": "",
+        },
+    ),
 ]
 
 

@@ -7,8 +7,12 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+
 class SessionOut(BaseModel):
     email: EmailStr
+
+
 class SectionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

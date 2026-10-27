@@ -1,4 +1,5 @@
 """Prueba rápida: python -m pytest no hace falta, se ejecuta con `python test_smoke.py`."""
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -34,5 +35,8 @@ with TestClient(app) as c:
 
     up = c.post("/api/admin/upload", headers=h, files={"file": ("a.png", b"\x89PNG", "image/png")})
     assert up.status_code == 200 and c.get(up.json()["url"]).status_code == 200
-    assert c.post("/api/admin/upload", headers=h, files={"file": ("a.exe", b"x", "application/x-msdownload")}).status_code == 400
+    assert (
+        c.post("/api/admin/upload", headers=h, files={"file": ("a.exe", b"x", "application/x-msdownload")}).status_code
+        == 400
+    )
 print("TODO OK")

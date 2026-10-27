@@ -1,14 +1,23 @@
 """Crear/borrar módulos. Usa base temporal: DATABASE_URL=sqlite:///./test_tmp.db python test_sections.py"""
+
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 with TestClient(app) as c:
     c.headers["Origin"] = "http://localhost:3000"
-    body ={"key": "ahorro-escolar", "title": "Ahorro escolar", "visible": True, "position": 9,
-            "content": {"template": "preguntas", "title": "Ahorro escolar", "items": []}}
+    body = {
+        "key": "ahorro-escolar",
+        "title": "Ahorro escolar",
+        "visible": True,
+        "position": 9,
+        "content": {"template": "preguntas", "title": "Ahorro escolar", "items": []},
+    }
     assert c.post("/api/admin/sections", json=body).status_code == 401
-    assert c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).status_code == 200
+    assert (
+        c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).status_code
+        == 200
+    )
     h = {}  # la sesión va en la cookie
 
     with c.websocket_connect("/api/public/ws") as ws:
