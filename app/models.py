@@ -2,22 +2,15 @@ from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
-
 from .database import Base
-
-
 def now() -> datetime:
     return datetime.now(timezone.utc)
-
-
 class Admin(Base):
     __tablename__ = "admins"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(200), unique=True)
     password_hash: Mapped[str] = mapped_column(String(300))
-
-
 class Section(Base):
     """Cada bloque editable de la web (hero, servicios, contacto, ...)."""
 
@@ -29,7 +22,6 @@ class Section(Base):
     visible: Mapped[bool] = mapped_column(Boolean, default=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
-
 
 class ContactMessage(Base):
     __tablename__ = "contact_messages"

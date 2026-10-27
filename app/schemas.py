@@ -7,13 +7,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
-
-
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
-
-
 class SectionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
