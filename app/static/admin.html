@@ -21,20 +21,20 @@ button.sec{background:transparent;color:var(--fg);border:1px solid var(--line)}b
 <header><h1>Panel admin · Cooperativa</h1><div class="row"><a class="mut" href="/" target="_blank">Ver sitio público ↗</a><button class="sec" id="out" hidden>Salir</button></div></header>
 <main id="app"></main><div id="msg"></div>
 <script>
-const API=location.origin;let token=sessionStorage.getItem('tk')||'',sections=[],cur=null,view='sections';
+const API=location.origin;let loggedIn=false,sections=[],cur=null,view='sections';
 const $=s=>document.querySelector(s),el=(t,a={},...k)=>{const e=document.createElement(t);for(const[x,v]of Object.entries(a))x.startsWith('on')?e[x]=v:e.setAttribute(x,v);k.flat().forEach(c=>e.append(c));return e};
 function toast(t,bad){const m=$('#msg');m.textContent=t;m.style.background=bad?'var(--bad)':'var(--ac)';m.style.display='block';setTimeout(()=>m.style.display='none',2200)}
-async function api(p,o={}){const h={...(o.body&&!(o.body instanceof FormData)?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})};
- const r=await fetch(API+p,{...o,headers:h});if(r.status===401&&token){logout();throw new Error('Sesión vencida')}
+async function api(p,o={}){const h=o.body&&!(o.body instanceof FormData)?{'Content-Type':'application/json'}:{};
+ const r=await fetch(API+p,{...o,headers:h,credentials:'same-origin'});if(r.status===401&&loggedIn){loggedIn=false;$('#out').hidden=true;login();throw new Error('Sesión vencida')}
  if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(typeof j.detail==='string'?j.detail:'Error '+r.status)}return r.status===204?null:r.json()}
-function logout(){token='';sessionStorage.removeItem('tk');$('#out').hidden=true;login()}
+async function logout(){try{await api('/api/admin/logout',{method:'POST'})}catch(x){}loggedIn=false;$('#out').hidden=true;login()}
 $('#out').onclick=logout;
 function login(){const app=$('#app');app.innerHTML='';
  const e=el('input',{id:'e',type:'email',value:'admin@cooperativa.com'}),p=el('input',{id:'p',type:'password'});
- const go=async()=>{try{const r=await api('/api/admin/login',{method:'POST',body:JSON.stringify({email:e.value,password:p.value})});token=r.access_token;sessionStorage.setItem('tk',token);start()}catch(x){toast(x.message,1)}};
+ const go=async()=>{try{const r=await api('/api/admin/login',{method:'POST',body:JSON.stringify({email:e.value,password:p.value})});start()}catch(x){toast(x.message,1)}};
  p.onkeydown=ev=>ev.key==='Enter'&&go();
  app.append(el('div',{class:'card',style:'max-width:380px;margin:60px auto'},el('h2',{},'Iniciar sesión'),el('label',{for:'e'},'Correo'),e,el('label',{for:'p'},'Contraseña'),p,el('br'),el('button',{onclick:go},'Entrar')))}
-async function start(){$('#out').hidden=false;try{sections=await api('/api/admin/sections');cur=cur&&sections.find(s=>s.key===cur.key)||sections[0];draw()}catch(x){toast(x.message,1)}}
+async function start(){loggedIn=true;$('#out').hidden=false;try{sections=await api('/api/admin/sections');cur=cur&&sections.find(s=>s.key===cur.key)||sections[0];draw()}catch(x){toast(x.message,1)}}
 function draw(){const app=$('#app');app.innerHTML='';
  const tabs=el('div',{class:'tabs'},sections.map(s=>el('button',{class:view==='sections'&&cur&&cur.key===s.key?'on':'',onclick:()=>{view='sections';cur=s;draw()}},s.title+(s.visible?'':' (oculta)'))),el('button',{class:view==='contacts'?'on':'',onclick:()=>{view='contacts';draw()}},'✉ Mensajes'));
  app.append(tabs);view==='contacts'?drawContacts():drawSection()}
@@ -65,5 +65,5 @@ async function drawContacts(){const list=await api('/api/admin/contacts').catch(
  if(!list.length)w.append(el('p',{class:'mut'},'No hay mensajes todavía.'));
  list.forEach(c=>w.append(el('div',{class:'card'+(c.read?'':' unread')},el('b',{},c.name),' ',el('span',{class:'mut'},c.email+(c.phone?' · '+c.phone:'')+' · '+new Date(c.created_at).toLocaleString()),el('p',{},c.message),el('div',{class:'row'},c.read?'':el('button',{onclick:async()=>{await api('/api/admin/contacts/'+c.id+'/read',{method:'PATCH'});draw()}},'Marcar leído'),el('button',{class:'del',onclick:async()=>{await api('/api/admin/contacts/'+c.id,{method:'DELETE'});draw()}},'Borrar')))));
  $('#app').append(w)}
-token?start():login();
+api('/api/admin/me').then(start,login);
 </script></body></html>

@@ -43,9 +43,11 @@ Públicos:
 - `POST /api/public/contact` → `{name, email, phone?, message}`
 - `WS   /api/public/ws` → eventos en vivo
 
-Admin (header `Authorization: Bearer <token>`):
-- `POST  /api/admin/login` → `{email, password}` → `{access_token}`
-- `GET   /api/admin/me`
+Admin (sesión en la cookie HttpOnly `sostecoop_admin`; el frontend envía las credenciales del navegador, sin `Authorization`;
+las solicitudes que cambian datos validan el `Origin` contra `CORS_ORIGINS`):
+- `POST  /api/admin/login` → `{email, password}` → `200 {"email"}` y `Set-Cookie` (HttpOnly, SameSite=Lax, Path=/, Max-Age = `TOKEN_MINUTES`, Secure si `ENVIRONMENT=production`)
+- `POST  /api/admin/logout` → `204`, borra la cookie
+- `GET   /api/admin/me` → `200 {"email"}` o `401`
 - `GET   /api/admin/sections` (incluye ocultas)
 - `PUT   /api/admin/sections/{key}` → `{title?, content?, visible?, position?}` (parcial)
 - `POST  /api/admin/upload` (multipart `file`, png/jpg/webp, máx 5 MB) → `{url}`

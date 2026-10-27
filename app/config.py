@@ -8,14 +8,20 @@ class Settings(BaseSettings):
     admin_email: str = "admin@cooperativa.com"
     admin_password: str = "CambiaEsta123"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
-    # Permite cualquier frontend de la red local (192.168.x.x, 10.x.x.x, localhost) en cualquier puerto
-    cors_origin_regex: str = r"https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?"
+    # Opcional (vacío = desactivado). Con cookies de sesión conviene listar los orígenes uno a uno en cors_origins.
+    cors_origin_regex: str = ""
     database_url: str = "sqlite:///./cooperativa.db"
     token_minutes: int = 480
+    # "production" activa el atributo Secure de la cookie de sesión (requiere HTTPS)
+    environment: str = "development"
 
     @property
     def origins(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.environment.strip().lower() == "production"
 
 
 settings = Settings()

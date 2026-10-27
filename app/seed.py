@@ -67,14 +67,41 @@ DEFAULT_SECTIONS = [
 ]
 
 
+# Secciones que el sitio necesita siempre: no se pueden borrar ni ocultar
+REQUIRED_KEYS = frozenset({"settings", "hero", "nosotros", "noticias", "contacto"})
+
+
+def _insert_default(db: Session, index: int) -> None:
+    key, title, content = DEFAULT_SECTIONS[index]
+    db.query(Section).filter(Section.position >= index).update({Section.position: Section.position + 1})
+    db.add(Section(key=key, title=title, content=content, position=index))
+    db.flush()
+
+
+def ensure_required_sections(db: Session) -> bool:
+    """Recrea las secciones obligatorias que falten y vuelve a mostrar las que estén ocultas."""
+    changed = False
+    for index, (key, _, _) in enumerate(DEFAULT_SECTIONS):
+        if key not in REQUIRED_KEYS:
+            continue
+        section = db.get(Section, key)
+        if section is None:
+            _insert_default(db, index)
+            changed = True
+        elif not section.visible:
+            section.visible = True
+            changed = True
+    if changed:
+        db.commit()
+    return changed
+
+
 def seed(db: Session) -> None:
     if not db.query(Admin).first():
         db.add(Admin(email=settings.admin_email, password_hash=hash_password(settings.admin_password)))
     # Crea las secciones que falten (también en bases ya existentes), respetando el orden del seed
-    for i, (key, title, content) in enumerate(DEFAULT_SECTIONS):
-        if db.get(Section, key):
-            continue
-        db.query(Section).filter(Section.position >= i).update({Section.position: Section.position + 1})
-        db.add(Section(key=key, title=title, content=content, position=i))
-        db.flush()
+    for index, (key, _, _) in enumerate(DEFAULT_SECTIONS):
+        if not db.get(Section, key):
+            _insert_default(db, index)
     db.commit()
+    ensure_required_sections(db)

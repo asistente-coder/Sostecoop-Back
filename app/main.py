@@ -25,7 +25,8 @@ app = FastAPI(title="API Plataforma Cooperativa de Ahorro", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.origins,
-    allow_origin_regex=settings.cors_origin_regex,
+    allow_origin_regex=settings.cors_origin_regex or None,
+    allow_credentials=True,  # necesario para que el navegador envíe y acepte la cookie de sesión
     allow_methods=["*"],
     allow_headers=["*"],
 )

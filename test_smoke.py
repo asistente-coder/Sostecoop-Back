@@ -4,15 +4,15 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 with TestClient(app) as c:
+    c.headers["Origin"] = "http://localhost:3000"  # el navegador lo envía solo; la sesión va en la cookie
     pub = c.get("/api/public/content").json()
-    assert len(pub) == 8, pub
+    assert len(pub) == 9, pub
 
     assert c.get("/api/admin/sections").status_code == 401
     assert c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "mal"}).status_code == 401
-    token = c.post(
-        "/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}
-    ).json()["access_token"]
-    h = {"Authorization": f"Bearer {token}"}
+    r = c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"})
+    assert r.status_code == 200 and "sostecoop_admin" in c.cookies
+    h = {}
 
     with c.websocket_connect("/api/public/ws") as ws:
         r = c.put("/api/admin/sections/hero", headers=h, json={"content": {"title": "NUEVO TITULO"}})
@@ -21,8 +21,8 @@ with TestClient(app) as c:
         assert msg["event"] == "section_updated" and msg["data"]["content"]["title"] == "NUEVO TITULO"
 
     c.put("/api/admin/sections/faq", headers=h, json={"visible": False})
-    assert len(c.get("/api/public/content").json()) == 7
-    assert len(c.get("/api/admin/sections", headers=h).json()) == 8
+    assert len(c.get("/api/public/content").json()) == 8
+    assert len(c.get("/api/admin/sections", headers=h).json()) == 9
     c.put("/api/admin/sections/faq", headers=h, json={"visible": True})
 
     r = c.post("/api/public/contact", json={"name": "Ana", "email": "ana@x.com", "message": "Hola, quiero info"})

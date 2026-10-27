@@ -1,8 +1,7 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -10,34 +9,43 @@ from ..database import get_db
 from ..models import Admin, ContactMessage, Section
 from ..news import validate_news
 from ..realtime import hub
-from ..schemas import ContactOut, LoginIn, SectionCreate, SectionOut, SectionUpdate, TokenOut
-from ..security import create_token, current_admin, verify_password
+from ..schemas import ContactOut, LoginIn, SectionCreate, SectionOut, SectionUpdate, SessionOut
+from ..security import (
+    clear_session_cookie,
+    create_token,
+    csrf_protect,
+    current_admin,
+    set_session_cookie,
+    verify_password,
+)
+from ..seed import REQUIRED_KEYS, ensure_required_sections
 
-router = APIRouter(prefix="/api/admin", tags=["Admin"])
+router = APIRouter(prefix="/api/admin", tags=["Admin"], dependencies=[Depends(csrf_protect)])
 UPLOADS = Path("uploads")
 ALLOWED = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 MAX_BYTES = 5 * 1024 * 1024
-def _login(email: str, password: str, db: Session) -> TokenOut:
-    admin = db.query(Admin).filter(Admin.email == email).first()
-    if not admin or not verify_password(password, admin.password_hash):
+@router.post("/login", response_model=SessionOut)
+def login(data: LoginIn, response: Response, db: Session = Depends(get_db)):
+    """Valida las credenciales y guarda el JWT en la cookie HttpOnly `sostecoop_admin` (no va en el cuerpo)."""
+    admin = db.query(Admin).filter(Admin.email == data.email).first()
+    if not admin or not verify_password(data.password, admin.password_hash):
         raise HTTPException(401, "Credenciales incorrectas")
-    return TokenOut(access_token=create_token(admin.email))
-@router.post("/login", response_model=TokenOut)
-def login(data: LoginIn, db: Session = Depends(get_db)):
-    return _login(data.email, data.password, db)
-@router.post("/login-form", response_model=TokenOut, include_in_schema=False)
-def login_form(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """Solo para el botón Authorize de /docs."""
-    return _login(form.username, form.password, db)
-@router.get("/me")
+    set_session_cookie(response, create_token(admin.email))
+    return {"email": admin.email}
+@router.post("/logout", status_code=204)
+def logout(response: Response):
+    """Cierra la sesión borrando la cookie (mismos path, SameSite y Secure con los que se creó)."""
+    clear_session_cookie(response)
+@router.get("/me", response_model=SessionOut)
 def me(admin: Admin = Depends(current_admin)):
+    """Sirve para comprobar si la sesión sigue activa: 200 con el correo, o 401."""
     return {"email": admin.email}
 @router.get("/sections", response_model=list[SectionOut])
 def list_sections(_: Admin = Depends(current_admin), db: Session = Depends(get_db)):
     """Incluye también las secciones ocultas."""
+    ensure_required_sections(db)
     return db.query(Section).order_by(Section.position).all()
-RESERVED_KEYS = {"settings", "hero", "nosotros", "noticias", "contacto", "inicio", "admin"}
-PROTECTED_KEYS = {"settings", "hero", "nosotros", "noticias", "contacto"}
+RESERVED_KEYS = REQUIRED_KEYS | {"inicio", "admin"}
 @router.post("/sections", response_model=SectionOut, status_code=201)
 async def create_section(data: SectionCreate, _: Admin = Depends(current_admin), db: Session = Depends(get_db)):
     if data.key in RESERVED_KEYS:
@@ -57,8 +65,8 @@ async def create_section(data: SectionCreate, _: Admin = Depends(current_admin),
     return section
 @router.delete("/sections/{key}", status_code=204)
 async def delete_section(key: str, _: Admin = Depends(current_admin), db: Session = Depends(get_db)):
-    if key in PROTECTED_KEYS:
-        raise HTTPException(403, "Esta sección no se puede borrar")
+    if key in REQUIRED_KEYS:
+        raise HTTPException(403, "Esta sección es obligatoria y no se puede borrar")
     section = db.get(Section, key)
     if not section:
         raise HTTPException(404, "Sección no existe")
@@ -73,6 +81,8 @@ async def update_section(
     if not section:
         raise HTTPException(404, "Sección no existe")
     changes = data.model_dump(exclude_unset=True)
+    if key in REQUIRED_KEYS and changes.get("visible") is False:
+        raise HTTPException(403, "Esta sección es obligatoria y no se puede ocultar")
     if key == "noticias" and changes.get("content") is not None:
         changes["content"] = validate_news(changes["content"])
     for field, value in changes.items():

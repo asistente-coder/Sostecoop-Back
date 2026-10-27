@@ -5,6 +5,7 @@ from ..database import get_db
 from ..models import ContactMessage, Section
 from ..realtime import hub
 from ..schemas import ContactIn, SectionOut
+from ..seed import ensure_required_sections
 
 router = APIRouter(prefix="/api/public", tags=["Público"])
 
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/api/public", tags=["Público"])
 @router.get("/content", response_model=list[SectionOut])
 def content(db: Session = Depends(get_db)):
     """Todas las secciones visibles, ordenadas. Es la carga inicial de la web."""
+    ensure_required_sections(db)  # las obligatorias nunca faltan en la respuesta pública
     return db.query(Section).filter(Section.visible.is_(True)).order_by(Section.position).all()
 
 

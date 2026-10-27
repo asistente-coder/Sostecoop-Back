@@ -38,10 +38,20 @@ Recomendado: React (Vite) + React Router. Cualquier framework sirve.
 
 ## 3. Panel admin (`/admin`)
 
-1. **Login**: `POST /api/admin/login` `{email, password}` → `{access_token}`. `401` = credenciales mal.
-   Guardar el token (memoria/`sessionStorage`) y mandarlo en todas las llamadas: `Authorization: Bearer <token>`.
-   Si cualquier llamada devuelve `401` → borrar token y volver al login (el token dura 8 h).
-   Proteger la ruta `/admin` con un guard (si no hay token, redirigir al login).
+1. **Sesión por cookie** (ya no hay token en el frontend):
+   - `POST /api/admin/login` `{email, password}` → `200 {"email": "..."}` y el navegador guarda la cookie `sostecoop_admin`
+     (HttpOnly: el JS no la ve). `401` = credenciales mal.
+   - **Todas** las llamadas a `/api/admin/*` deben ir con credenciales: `fetch(url, { credentials: "include" })`,
+     o en Angular `withCredentials: true` (mejor con un interceptor). Ya no se envía `Authorization`.
+   - `GET /api/admin/me` → `200 {"email": "..."}` si la sesión sigue activa, `401` si no. Úsalo para el guard de `/admin`
+     al cargar la app.
+   - `POST /api/admin/logout` → `204` y la cookie se borra.
+   - Cualquier `401` → volver al login (la sesión dura 8 h).
+   - **CSRF:** las llamadas POST/PUT/PATCH/DELETE se rechazan con `403` si el `Origin` del navegador no está en `CORS_ORIGINS`
+     (el navegador lo envía solo; no hay que hacer nada).
+   - **Importante (SameSite=Lax):** la cookie solo viaja si frontend y API están en el mismo *sitio*. `localhost:3000` → `localhost:8000`
+     funciona (el puerto no cuenta), pero `localhost:3000` → `192.168.x.x:8000` NO. En desarrollo usa un proxy
+     (en Angular, `proxy.conf.json`: `/api` → `http://IP:8000`, con `ws: true`) para que el navegador vea todo en el mismo origen.
 2. **Lista de secciones**: `GET /api/admin/sections` (incluye ocultas). Mostrar una lista/pestañas por sección.
 3. **Editor por sección**: formulario generado a partir de `content` (inputs de texto, textarea, y listas editables para `items` con agregar/quitar/ordenar).
    Guardar con `PUT /api/admin/sections/{key}` – es parcial, se pueden mandar solo los campos que cambian:
@@ -59,7 +69,7 @@ Recomendado: React (Vite) + React Router. Cualquier framework sirve.
 
 ## 4. Detalles técnicos
 
-- **CORS**: el backend solo acepta los orígenes de `CORS_ORIGINS` (por defecto `localhost:5173` y `localhost:3000`). Si el front usa otro puerto/dominio, pedirlo.
+- **CORS**: el backend solo acepta los orígenes listados en `CORS_ORIGINS` (por defecto `localhost:5173` y `localhost:3000`), con credenciales. Si el front usa otro puerto/dominio (p. ej. Angular en `http://localhost:4200`), hay que añadirlo.
 - Fechas en ISO 8601 UTC.
 - Errores: `{"detail": "mensaje"}` (o lista para `422`). Mostrar el `detail` al usuario.
 - Credenciales de prueba de desarrollo: `admin@cooperativa.com` / `CambiaEsta123` (se cambiarán en producción).

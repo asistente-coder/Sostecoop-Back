@@ -4,11 +4,12 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 with TestClient(app) as c:
-    keys = [s["key"] for s in c.get("/api/public/content").json()]
+    c.headers["Origin"] = "http://localhost:3000"
+    keys =[s["key"] for s in c.get("/api/public/content").json()]
     assert "noticias" in keys and keys.index("noticias") == keys.index("beneficios") + 1, keys
 
-    tk = c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).json()["access_token"]
-    h = {"Authorization": f"Bearer {tk}"}
+    assert c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).status_code == 200
+    h = {}  # la sesión va en la cookie
     put = lambda items: c.put("/api/admin/sections/noticias", headers=h, json={"content": {"title": "N", "items": items}})
 
     assert put([{"title": ""}]).status_code == 422
