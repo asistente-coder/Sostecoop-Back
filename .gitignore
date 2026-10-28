@@ -5,3 +5,5 @@ __pycache__/
 .venv/
 *.bak
 test_tmp.db
+.env.*
+!.env.example
