@@ -48,6 +48,87 @@ python -m uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8
 
 Después de cambiar el `.env`, reiniciar el servidor.
 
+## Administrador y contraseña
+
+**Cómo se crea.** No hay que ejecutar ningún comando: al arrancar, `seed()` (`app/seed.py`) crea el administrador con
+`ADMIN_EMAIL` y `ADMIN_PASSWORD` del `.env`, pero **solo si la tabla `admins` está vacía**:
+
+```python
+if not db.query(Admin).first():
+    db.add(Admin(email=settings.admin_email, password_hash=hash_password(settings.admin_password)))
+```
+
+La contraseña nunca se guarda en claro: `hash_password` (`app/security.py`) guarda `sal$hash`, con PBKDF2-HMAC-SHA256,
+200 000 iteraciones y una sal aleatoria de 16 bytes. El login compara con `verify_password`.
+
+**Cómo cambiarlos.** Editar `ADMIN_EMAIL` / `ADMIN_PASSWORD` en el `.env` **no** modifica un admin que ya existe. Para crear
+un administrador nuevo o cambiar una contraseña se usa `crear_admin.py`, que pide la contraseña por teclado (mínimo 8
+caracteres, no queda en el historial de la terminal):
+
+```powershell
+python crear_admin.py correo@ejemplo.com
+```
+
+- Si el correo ya existe, actualiza su contraseña; si no, crea un administrador nuevo (puede haber varios).
+- Usa la base de `DATABASE_URL` del `.env`, así que se ejecuta en la carpeta del proyecto con el `.venv` activado.
+- Las sesiones ya abiertas siguen siendo válidas hasta que venzan (`TOKEN_MINUTES`); para cerrarlas todas, cambiar `SECRET_KEY`.
+
+### Crear otro administrador por código (paso a paso)
+
+Puede haber varios administradores, cada uno con su correo y su contraseña, y todos entran por el mismo login. Todos tienen
+los mismos permisos (no hay roles) y la bitácora guarda el correo de quien hizo cada cambio.
+
+1. Abrir una terminal en la carpeta del proyecto y activar el entorno virtual:
+
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   ```
+
+2. Crear un archivo temporal `nuevo_admin.py` con este código, cambiando `EMAIL` y `PASSWORD`:
+
+   ```python
+   from app.database import Base, SessionLocal, engine
+   from app.models import Admin
+   from app.security import hash_password
+
+   EMAIL = "segundo.admin@ejemplo.com"
+   PASSWORD = "UnaClaveSegura123"
+
+   Base.metadata.create_all(engine)
+   with SessionLocal() as db:
+       if db.query(Admin).filter(Admin.email == EMAIL).first():
+           raise SystemExit(f"{EMAIL} ya existe; para cambiar su contraseña usa crear_admin.py")
+       db.add(Admin(email=EMAIL, password_hash=hash_password(PASSWORD)))
+       db.commit()
+       print("Administrador creado:", EMAIL)
+   ```
+
+3. Ejecutarlo. Usa la base de `DATABASE_URL` del `.env`, y no hace falta detener el servidor:
+
+   ```powershell
+   python nuevo_admin.py
+   ```
+
+   Debe imprimir `Administrador creado: ...`.
+
+4. **Borrar el archivo**, porque la contraseña queda escrita en claro dentro de él, y no subirlo a GitHub:
+
+   ```powershell
+   Remove-Item nuevo_admin.py
+   ```
+
+5. Comprobar: entrar al login del admin con el correo y la contraseña nuevos, o consultar la tabla:
+
+   ```sql
+   SELECT id, email FROM admins ORDER BY id;
+   ```
+
+Notas:
+- El correo es único (`UNIQUE` en la tabla `admins`): repetirlo da error. Para cambiar la contraseña de uno que ya existe se usa `crear_admin.py`.
+- Si se crea un administrador **antes del primer arranque del servidor**, el del `.env` ya no se crea, porque `seed()` solo
+  lo hace cuando la tabla `admins` está vacía. Conviene arrancar el servidor una vez primero.
+- Para no dejar la contraseña escrita en ningún archivo, usar `crear_admin.py`, que la pide por teclado.
+
 ## Pruebas
 
 Cada archivo se ejecuta solo y debe terminar con su mensaje de OK. Usan una base temporal, no tocan la real:
@@ -73,6 +154,7 @@ app/
   routers/admin.py    /api/admin/*   (cookie de sesión)
   realtime.py    reparte los cambios a los WebSockets
   seed.py        secciones iniciales y secciones obligatorias
+crear_admin.py                crea un administrador o cambia su contraseña
 migrar_sqlite_a_postgres.py   pasa los datos de SQLite a PostgreSQL
 ```
 
@@ -162,3 +244,5 @@ backend en el código. Ejemplo (Angular, `proxy.conf.json`):
 - Poner `ENVIRONMENT=production` y servir todo por HTTPS (WebSocket `wss://`), con el sitio y la API bajo el mismo dominio.
 - Cambiar `SECRET_KEY`, `ADMIN_PASSWORD` y poner en `CORS_ORIGINS` el dominio real.
 - Si hay varios procesos, cambiar `realtime.py` por Redis pub/sub (ahora el hub vive en la memoria de un solo proceso).
+
+
