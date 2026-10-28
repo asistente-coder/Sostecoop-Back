@@ -42,7 +42,7 @@ python -m uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8
 | `SECRET_KEY` | Firma de la sesión. Si cambia, se cierran las sesiones abiertas |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin que se crea al primer arranque |
 | `DATABASE_URL` | `sqlite:///./cooperativa.db` o `postgresql+psycopg://USUARIO:CLAVE@localhost:5433/cooperativa` |
-| `CORS_ORIGINS` | Orígenes del frontend permitidos, separados por coma y escritos uno a uno (`http://localhost:3000`, `http://192.168.12.94:3000`, ...) |
+| `CORS_ORIGINS` | Orígenes del frontend permitidos, separados por coma y escritos uno a uno (`http://localhost:3000`, `http://localhost:5173`, ...) |
 | `TOKEN_MINUTES` | Duración de la sesión y de la cookie (480 = 8 h, fija desde el login) |
 | `ENVIRONMENT` | `production` marca la cookie como `Secure` (solo viaja por HTTPS) |
 
@@ -223,12 +223,12 @@ backend en el código. Ejemplo (Angular, `proxy.conf.json`):
 
 ```json
 {
-  "/api":     { "target": "http://192.168.12.95:8000", "secure": false, "changeOrigin": true, "ws": true },
-  "/uploads": { "target": "http://192.168.12.95:8000", "secure": false, "changeOrigin": true }
+  "/api":     { "target": "http://localhost:8000", "secure": false, "changeOrigin": true, "ws": true },
+  "/uploads": { "target": "http://localhost:8000", "secure": false, "changeOrigin": true }
 }
 ```
 
-- Cada origen desde el que se abra el frontend (`http://localhost:3000`, `http://IP:3000`, ...) debe estar en `CORS_ORIGINS`; si no,
+- Cada origen desde el que se abra el frontend (por ejemplo `http://localhost:3000`) debe estar en `CORS_ORIGINS`; si no,
   el login responde `403`.
 - Más detalles de integración, con ejemplos de peticiones: [FRONTEND.md](FRONTEND.md).
 
