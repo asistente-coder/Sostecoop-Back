@@ -15,7 +15,7 @@ El backend también sirve un panel y una página de prueba sencillos en `/admin`
 - **Python 3.10 a 3.15, de 64 bits** (recomendado: 3.12 o 3.13, que son las más probadas). Las dependencias se instalan como
   paquetes ya compilados; con una versión de Python fuera de ese rango, o de 32 bits, `pip` intenta compilarlas y falla
   pidiendo `link.exe` / «Microsoft C++ Build Tools». Si pasa, instalar Python 3.12 o 3.13 y crear de nuevo el `.venv`.
-- PostgreSQL (recomendado) o SQLite para pruebas rápidas.
+- **PostgreSQL** (es la base de datos del proyecto), con la base `cooperativa` creada (ver «PostgreSQL» más abajo).
 
 ## Arrancar
 
@@ -30,10 +30,10 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
 ```
 
-**No hace falta crear un `.env` para arrancar.** Sin él se usan los valores por defecto: base SQLite (`cooperativa.db`) y el
-administrador inicial de más abajo.
-
-Para cambiar la configuración (por ejemplo, usar PostgreSQL), se copia la plantilla. El archivo debe llamarse exactamente `.env`
+Antes de arrancar, PostgreSQL debe estar encendido y la base `cooperativa` creada (ver «PostgreSQL» más abajo).
+**No hace falta crear un `.env`** si PostgreSQL está en `localhost:5432` con usuario `postgres` y contraseña `postgres`: son los
+valores por defecto, junto con el administrador inicial de más abajo. Con otros datos de conexión (otro puerto o contraseña, por
+ejemplo) sí hace falta el `.env`: se copia la plantilla y se edita `DATABASE_URL`. El archivo debe llamarse exactamente `.env`
 (con el punto al inicio y sin nada después); `.env.example` es solo la plantilla y el programa no la lee:
 
 ```powershell
@@ -45,8 +45,8 @@ Después se edita el `.env` y se reinicia el servidor. El `.env` no se sube a Gi
 - `--host 0.0.0.0` hace el servidor accesible desde otros equipos de la red (por ejemplo, el frontend de un compañero).
 - `--reload-dir app` evita que se reinicie por cambios en `.venv` o en `uploads/`.
 - Documentación interactiva: http://localhost:8000/docs · Estado: http://localhost:8000/api/health
-- Al primer arranque se crean las tablas, el admin y las secciones iniciales. Sin `.env` la base es SQLite
-  (`cooperativa.db`); para PostgreSQL ver más abajo.
+- Al primer arranque se crean las tablas, el admin y las secciones iniciales. Si PostgreSQL no responde, el servidor se detiene
+  en pocos segundos con un mensaje que indica a qué base intentó conectar.
 - **Administrador inicial:** al primer arranque se crea solo, sin ejecutar nada más, con el correo `admin.sostecoop@gmail.com` y la
   contraseña `sostecoopltda` (o los de `ADMIN_EMAIL` / `ADMIN_PASSWORD` si están en el `.env`). **Cambiarlos antes de publicar**,
   igual que `SECRET_KEY`.
@@ -57,7 +57,7 @@ Después se edita el `.env` y se reinicia el servidor. El `.env` no se sube a Gi
 |----------|----------------|
 | `SECRET_KEY` | Firma de la sesión. Si cambia, se cierran las sesiones abiertas |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin que se crea al primer arranque. Por defecto `admin.sostecoop@gmail.com` / `sostecoopltda` |
-| `DATABASE_URL` | `sqlite:///./cooperativa.db` o `postgresql+psycopg://USUARIO:CLAVE@localhost:5433/cooperativa` |
+| `DATABASE_URL` | Por defecto `postgresql+psycopg://postgres:postgres@localhost:5432/cooperativa`. Para pruebas rápidas sin PostgreSQL: `sqlite:///./cooperativa.db` |
 | `CORS_ORIGINS` | Orígenes del frontend permitidos, separados por coma y escritos uno a uno (`http://localhost:3000`, `http://localhost:5173`, ...) |
 | `TOKEN_MINUTES` | Duración de la sesión y de la cookie (480 = 8 h, fija desde el login) |
 | `ENVIRONMENT` | `production` marca la cookie como `Secure` (solo viaja por HTTPS) |
@@ -244,10 +244,24 @@ backend en el código. Ejemplo (Angular, `proxy.conf.json`):
 
 ## PostgreSQL
 
-1. Crear la base (una sola vez): `CREATE DATABASE cooperativa;`
-2. En `.env`: `DATABASE_URL=postgresql+psycopg://USUARIO:CLAVE@localhost:5433/cooperativa` (si la clave tiene símbolos como `@` o `#`, codificarlos: `@` → `%40`).
-3. Para llevar lo que ya hay en SQLite: `python migrar_sqlite_a_postgres.py`.
-4. Arrancar el servidor normalmente. Las tablas se crean solas.
+PostgreSQL es la base de datos del proyecto. Pasos para dejarla lista:
+
+1. Instalar PostgreSQL y dejarlo encendido. Anotar el usuario, la contraseña y el puerto (por defecto `postgres` y `5432`).
+2. Crear la base, una sola vez (con `psql` o pgAdmin):
+
+   ```powershell
+   psql -U postgres -p 5432 -c "CREATE DATABASE cooperativa;"
+   ```
+
+3. Si los datos de conexión **no** son `postgres` / `postgres` / `5432`, crear el `.env` (`Copy-Item .env.example .env`) y poner en él:
+
+   ```
+   DATABASE_URL=postgresql+psycopg://USUARIO:CLAVE@localhost:PUERTO/cooperativa
+   ```
+
+   Si la clave tiene símbolos como `@` o `#`, hay que codificarlos: `@` → `%40`.
+4. Arrancar el servidor normalmente. Las tablas, las secciones iniciales y el administrador se crean solos en esa base.
+5. Si ya había datos en una base SQLite antigua y se quieren llevar a PostgreSQL: `python migrar_sqlite_a_postgres.py`.
 
 ## Producción
 

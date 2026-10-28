@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import OperationalError
 
 from .config import settings
 from .database import Base, SessionLocal, engine
@@ -14,7 +15,14 @@ from .seed import seed
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(engine)
+    try:
+        Base.metadata.create_all(engine)
+    except OperationalError as exc:
+        raise RuntimeError(
+            f"No se pudo conectar a la base de datos ({engine.url.render_as_string(hide_password=True)}). "
+            "Revisa que PostgreSQL esté encendido, que la base «cooperativa» exista "
+            "y que DATABASE_URL del .env sea correcta."
+        ) from exc
     with SessionLocal() as db:
         seed(db)
     yield

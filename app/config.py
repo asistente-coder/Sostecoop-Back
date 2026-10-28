@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
     # Opcional (vacío = desactivado). Con cookies de sesión conviene listar los orígenes uno a uno en cors_origins.
     cors_origin_regex: str = ""
-    database_url: str = "sqlite:///./cooperativa.db"
+    # PostgreSQL local con la base "cooperativa" creada. Para otros datos de conexión, definir DATABASE_URL en el .env
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/cooperativa"
     token_minutes: int = 480
     # "production" activa el atributo Secure de la cookie de sesión (requiere HTTPS)
     environment: str = "development"
