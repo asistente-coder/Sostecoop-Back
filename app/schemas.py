@@ -52,3 +52,22 @@ class ContactOut(ContactIn):
     id: int
     read: bool
     created_at: datetime
+
+
+class ActivityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    admin_email: str | None
+    action: str
+    entity_type: str | None
+    entity_key: str | None
+    summary: str
+    details: dict[str, Any] | None
+    ip: str | None
+    created_at: datetime
+
+
+class ActivityPage(BaseModel):
+    total: int
+    items: list[ActivityOut]
