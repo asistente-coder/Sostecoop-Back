@@ -73,7 +73,7 @@ python crear_admin.py correo@ejemplo.com
 - Usa la base de `DATABASE_URL` del `.env`, así que se ejecuta en la carpeta del proyecto con el `.venv` activado.
 - Las sesiones ya abiertas siguen siendo válidas hasta que venzan (`TOKEN_MINUTES`); para cerrarlas todas, cambiar `SECRET_KEY`.
 
-### Crear otro administrador por código (paso a paso)
+### Crear otro administrador (paso a paso)
 
 Puede haber varios administradores, cada uno con su correo y su contraseña, y todos entran por el mismo login. Todos tienen
 los mismos permisos (no hay roles) y la bitácora guarda el correo de quien hizo cada cambio.
@@ -84,50 +84,34 @@ los mismos permisos (no hay roles) y la bitácora guarda el correo de quien hizo
    .\.venv\Scripts\Activate.ps1
    ```
 
-2. Crear un archivo temporal `nuevo_admin.py` con este código, cambiando `EMAIL` y `PASSWORD`:
-
-   ```python
-   from app.database import Base, SessionLocal, engine
-   from app.models import Admin
-   from app.security import hash_password
-
-   EMAIL = "segundo.admin@ejemplo.com"
-   PASSWORD = "UnaClaveSegura123"
-
-   Base.metadata.create_all(engine)
-   with SessionLocal() as db:
-       if db.query(Admin).filter(Admin.email == EMAIL).first():
-           raise SystemExit(f"{EMAIL} ya existe; para cambiar su contraseña usa crear_admin.py")
-       db.add(Admin(email=EMAIL, password_hash=hash_password(PASSWORD)))
-       db.commit()
-       print("Administrador creado:", EMAIL)
-   ```
-
-3. Ejecutarlo. Usa la base de `DATABASE_URL` del `.env`, y no hace falta detener el servidor:
+2. Ejecutar `crear_admin.py` con el correo del nuevo administrador (no hace falta detener el servidor):
 
    ```powershell
-   python nuevo_admin.py
+   python crear_admin.py nuevo.admin@ejemplo.com
    ```
 
-   Debe imprimir `Administrador creado: ...`.
+3. Escribir la contraseña cuando la pida, y repetirla. No se ve mientras se escribe y debe tener mínimo 8 caracteres:
 
-4. **Borrar el archivo**, porque la contraseña queda escrita en claro dentro de él, y no subirlo a GitHub:
-
-   ```powershell
-   Remove-Item nuevo_admin.py
+   ```
+   Contraseña nueva:
+   Repite la contraseña:
    ```
 
-5. Comprobar: entrar al login del admin con el correo y la contraseña nuevos, o consultar la tabla:
+   Si todo sale bien, imprime `Administrador creado: nuevo.admin@ejemplo.com`.
+
+4. Comprobar: entrar al login del admin con el correo y la contraseña nuevos, o consultar la tabla:
 
    ```sql
    SELECT id, email FROM admins ORDER BY id;
    ```
 
 Notas:
-- El correo es único (`UNIQUE` en la tabla `admins`): repetirlo da error. Para cambiar la contraseña de uno que ya existe se usa `crear_admin.py`.
+- El correo es único: si ya existe, el script no crea otro, sino que **cambia la contraseña** de ese administrador
+  (imprime `Contraseña actualizada para ...`).
+- Escribe en la base de `DATABASE_URL` del `.env`. Si en esa terminal se definió antes `DATABASE_URL` para las pruebas,
+  abrir una terminal nueva o ejecutar `Remove-Item Env:DATABASE_URL`; si no, el administrador se crea en la base temporal.
 - Si se crea un administrador **antes del primer arranque del servidor**, el del `.env` ya no se crea, porque `seed()` solo
   lo hace cuando la tabla `admins` está vacía. Conviene arrancar el servidor una vez primero.
-- Para no dejar la contraseña escrita en ningún archivo, usar `crear_admin.py`, que la pide por teclado.
 
 ## Pruebas
 
@@ -138,7 +122,10 @@ $env:DATABASE_URL = "sqlite:///./test_tmp.db"
 python test_smoke.py; python test_activity.py; python test_cookie.py
 python test_sections.py; python test_required.py; python test_news.py
 Remove-Item test_tmp.db
+Remove-Item Env:DATABASE_URL    # vuelve a usar la base del .env
 ```
+
+El último comando es importante: `$env:DATABASE_URL` sigue definido en esa terminal, y si luego se arranca el servidor o se crea un administrador ahí, se escribiría en la base temporal y no en la real.
 
 ## Estructura
 
@@ -210,7 +197,7 @@ una frase legible (`summary`), el detalle (`details`, JSON), la IP y la fecha. S
 | `upload` | Imagen subida (nombre original, tipo y tamaño) |
 | `contact_read`, `contact_delete` | Mensajes de contacto |
 
-No se registran los guardados sin cambios reales ni las solicitudes rechazadas.
+No se registran los guardados sin cambios reales ni las solicitudes rechazadas por permisos o validación (por ejemplo, intentar borrar una sección obligatoria). Los intentos de login fallidos sí se registran.
 
 `GET /api/admin/activity` → `{"total": N, "items": [...]}`, de lo más reciente a lo más antiguo.
 Parámetros opcionales: `limit` (1–200, por defecto 50), `offset`, `action`, `entity_type`, `entity_key`, `admin_email`.
