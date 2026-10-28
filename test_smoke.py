@@ -2,6 +2,7 @@
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 
 with TestClient(app) as c:
@@ -10,8 +11,8 @@ with TestClient(app) as c:
     assert len(pub) == 9, pub
 
     assert c.get("/api/admin/sections").status_code == 401
-    assert c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "mal"}).status_code == 401
-    r = c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"})
+    assert c.post("/api/admin/login", json={"email": settings.admin_email, "password": "mal"}).status_code == 401
+    r = c.post("/api/admin/login", json={"email": settings.admin_email, "password": settings.admin_password})
     assert r.status_code == 200 and "sostecoop_admin" in c.cookies
     h = {}
 

@@ -34,14 +34,16 @@ python -m uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8
 - Documentación interactiva: http://localhost:8000/docs · Estado: http://localhost:8000/api/health
 - Al primer arranque se crean las tablas, el admin y las secciones iniciales. Con el `.env.example` la base es SQLite
   (`cooperativa.db`); para PostgreSQL ver más abajo.
-- Credenciales iniciales: las de `.env` (`ADMIN_EMAIL` / `ADMIN_PASSWORD`). **Cambiarlas antes de publicar**, igual que `SECRET_KEY`.
+- **Administrador inicial:** al primer arranque se crea solo, sin ejecutar nada más, con el correo `admin.sostecoop@gmail.com` y la
+  contraseña `sostecoopltda` (o los de `ADMIN_EMAIL` / `ADMIN_PASSWORD` si están en el `.env`). **Cambiarlos antes de publicar**,
+  igual que `SECRET_KEY`.
 
 ## Configuración (`.env`)
 
 | Variable | Para qué sirve |
 |----------|----------------|
 | `SECRET_KEY` | Firma de la sesión. Si cambia, se cierran las sesiones abiertas |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin que se crea al primer arranque |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Admin que se crea al primer arranque. Por defecto `admin.sostecoop@gmail.com` / `sostecoopltda` |
 | `DATABASE_URL` | `sqlite:///./cooperativa.db` o `postgresql+psycopg://USUARIO:CLAVE@localhost:5433/cooperativa` |
 | `CORS_ORIGINS` | Orígenes del frontend permitidos, separados por coma y escritos uno a uno (`http://localhost:3000`, `http://localhost:5173`, ...) |
 | `TOKEN_MINUTES` | Duración de la sesión y de la cookie (480 = 8 h, fija desde el login) |
@@ -51,8 +53,15 @@ Después de cambiar el `.env`, reiniciar el servidor.
 
 ## Administrador y contraseña
 
-**Cómo se crea.** No hay que ejecutar ningún comando: al arrancar, `seed()` (`app/seed.py`) crea el administrador con
-`ADMIN_EMAIL` y `ADMIN_PASSWORD` del `.env`, pero **solo si la tabla `admins` está vacía**:
+**Cómo se crea.** No hay que ejecutar ningún comando: al correr `uvicorn` por primera vez, `seed()` (`app/seed.py`) crea el
+administrador con `ADMIN_EMAIL` y `ADMIN_PASSWORD`, pero **solo si la tabla `admins` está vacía**. Si no existe un `.env` (o no
+define esas variables), se usan los valores por defecto de `app/config.py`:
+
+| Correo | Contraseña |
+|--------|------------|
+| `admin.sostecoop@gmail.com` | `sostecoopltda` |
+
+El código que lo hace:
 
 ```python
 if not db.query(Admin).first():

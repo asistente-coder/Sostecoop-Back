@@ -72,7 +72,7 @@ Recomendado: React (Vite) + React Router. Cualquier framework sirve.
 - **CORS**: el backend solo acepta los orígenes listados en `CORS_ORIGINS` (por defecto `localhost:5173` y `localhost:3000`), con credenciales. Si el front usa otro puerto/dominio (p. ej. Angular en `http://localhost:4200`), hay que añadirlo.
 - Fechas en ISO 8601 UTC.
 - Errores: `{"detail": "mensaje"}` (o lista para `422`). Mostrar el `detail` al usuario.
-- Credenciales de prueba de desarrollo: `admin@cooperativa.com` / `CambiaEsta123` (se cambiarán en producción).
+- Credenciales de prueba de desarrollo: `admin.sostecoop@gmail.com` / `sostecoopltda` (se cambiarán en producción).
 - Accesibilidad/UX mínima: estados de carga, errores visibles, botón "Guardando…" y confirmación al guardar.
 
 ## 5. Checklist de entrega

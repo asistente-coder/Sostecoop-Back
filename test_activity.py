@@ -2,9 +2,10 @@
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 
-CRED = {"email": "admin@cooperativa.com", "password": "CambiaEsta123"}
+CRED = {"email": settings.admin_email, "password": settings.admin_password}
 
 with TestClient(app, headers={"Origin": "http://localhost:3000"}) as c:
     assert c.get("/api/admin/activity").status_code == 401  # solo con sesión

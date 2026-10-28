@@ -10,7 +10,7 @@ from app.main import app
 from app.security import create_token
 
 OK = "http://localhost:3000"
-CRED = {"email": "admin@cooperativa.com", "password": "CambiaEsta123"}
+CRED = {"email": settings.admin_email, "password": settings.admin_password}
 
 
 def new_client():

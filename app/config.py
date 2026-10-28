@@ -5,8 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
     secret_key: str = "dev-secret"
-    admin_email: str = "admin@cooperativa.com"
-    admin_password: str = "CambiaEsta123"
+    admin_email: str = "admin.sostecoop@gmail.com"
+    admin_password: str = "sostecoopltda"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
     # Opcional (vacío = desactivado). Con cookies de sesión conviene listar los orígenes uno a uno en cors_origins.
     cors_origin_regex: str = ""

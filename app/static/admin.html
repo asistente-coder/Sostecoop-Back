@@ -30,7 +30,7 @@ async function api(p,o={}){const h=o.body&&!(o.body instanceof FormData)?{'Conte
 async function logout(){try{await api('/api/admin/logout',{method:'POST'})}catch(x){}loggedIn=false;$('#out').hidden=true;login()}
 $('#out').onclick=logout;
 function login(){const app=$('#app');app.innerHTML='';
- const e=el('input',{id:'e',type:'email',value:'admin@cooperativa.com'}),p=el('input',{id:'p',type:'password'});
+ const e=el('input',{id:'e',type:'email',value:'admin.sostecoop@gmail.com'}),p=el('input',{id:'p',type:'password'});
  const go=async()=>{try{const r=await api('/api/admin/login',{method:'POST',body:JSON.stringify({email:e.value,password:p.value})});start()}catch(x){toast(x.message,1)}};
  p.onkeydown=ev=>ev.key==='Enter'&&go();
  app.append(el('div',{class:'card',style:'max-width:380px;margin:60px auto'},el('h2',{},'Iniciar sesión'),el('label',{for:'e'},'Correo'),e,el('label',{for:'p'},'Contraseña'),p,el('br'),el('button',{onclick:go},'Entrar')))}

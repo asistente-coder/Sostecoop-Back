@@ -2,6 +2,7 @@
 
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
 
 with TestClient(app) as c:
@@ -10,7 +11,7 @@ with TestClient(app) as c:
     assert "noticias" in keys and keys.index("noticias") == keys.index("beneficios") + 1, keys
 
     assert (
-        c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).status_code
+        c.post("/api/admin/login", json={"email": settings.admin_email, "password": settings.admin_password}).status_code
         == 200
     )
     h = {}  # la sesión va en la cookie

@@ -3,6 +3,7 @@
 from fastapi.testclient import TestClient
 
 from app.database import SessionLocal
+from app.config import settings
 from app.main import app
 from app.models import Section
 from app.seed import REQUIRED_KEYS, seed
@@ -17,7 +18,7 @@ def public_keys(c):
 with TestClient(app) as c:
     c.headers["Origin"] = "http://localhost:3000"
     assert (
-        c.post("/api/admin/login", json={"email": "admin@cooperativa.com", "password": "CambiaEsta123"}).status_code
+        c.post("/api/admin/login", json={"email": settings.admin_email, "password": settings.admin_password}).status_code
         == 200
     )
     h = {}  # la sesión va en la cookie
