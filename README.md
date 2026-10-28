@@ -12,8 +12,9 @@ El backend también sirve un panel y una página de prueba sencillos en `/admin`
 
 ## Requisitos
 
-- **Python 3.10 a 3.14, de 64 bits.** Las dependencias se instalan como paquetes ya compilados; con una versión de Python
-  fuera de ese rango, o de 32 bits, `pip` intenta compilar `pydantic-core` y falla pidiendo `link.exe`.
+- **Python 3.10 a 3.15, de 64 bits** (recomendado: 3.12 o 3.13, que son las más probadas). Las dependencias se instalan como
+  paquetes ya compilados; con una versión de Python fuera de ese rango, o de 32 bits, `pip` intenta compilarlas y falla
+  pidiendo `link.exe` / «Microsoft C++ Build Tools». Si pasa, instalar Python 3.12 o 3.13 y crear de nuevo el `.venv`.
 - PostgreSQL (recomendado) o SQLite para pruebas rápidas.
 
 ## Arrancar
