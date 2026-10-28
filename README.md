@@ -19,20 +19,33 @@ El backend también sirve un panel y una página de prueba sencillos en `/admin`
 
 ## Arrancar
 
-Windows (PowerShell), en la carpeta del proyecto:
+Windows (PowerShell). Desde cero, tal como lo haría quien descarga el proyecto de GitHub:
 
 ```powershell
+git clone https://github.com/asistente-coder/Sostecoop-Back.git
+cd Sostecoop-Back
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env        # y editar los valores
 python -m uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
 ```
+
+**No hace falta crear un `.env` para arrancar.** Sin él se usan los valores por defecto: base SQLite (`cooperativa.db`) y el
+administrador inicial de más abajo.
+
+Para cambiar la configuración (por ejemplo, usar PostgreSQL), se copia la plantilla. El archivo debe llamarse exactamente `.env`
+(con el punto al inicio y sin nada después); `.env.example` es solo la plantilla y el programa no la lee:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Después se edita el `.env` y se reinicia el servidor. El `.env` no se sube a GitHub, porque puede tener claves.
 
 - `--host 0.0.0.0` hace el servidor accesible desde otros equipos de la red (por ejemplo, el frontend de un compañero).
 - `--reload-dir app` evita que se reinicie por cambios en `.venv` o en `uploads/`.
 - Documentación interactiva: http://localhost:8000/docs · Estado: http://localhost:8000/api/health
-- Al primer arranque se crean las tablas, el admin y las secciones iniciales. Con el `.env.example` la base es SQLite
+- Al primer arranque se crean las tablas, el admin y las secciones iniciales. Sin `.env` la base es SQLite
   (`cooperativa.db`); para PostgreSQL ver más abajo.
 - **Administrador inicial:** al primer arranque se crea solo, sin ejecutar nada más, con el correo `admin.sostecoop@gmail.com` y la
   contraseña `sostecoopltda` (o los de `ADMIN_EMAIL` / `ADMIN_PASSWORD` si están en el `.env`). **Cambiarlos antes de publicar**,
