@@ -106,6 +106,9 @@ DEFAULT_SECTIONS = [
 # Secciones que el sitio necesita siempre: no se pueden borrar ni ocultar
 REQUIRED_KEYS = frozenset({"settings", "hero", "nosotros", "noticias", "contacto"})
 
+# Máximo de módulos (secciones que no son obligatorias); las obligatorias no cuentan
+MAX_MODULES = 7
+
 
 def _insert_default(db: Session, index: int) -> None:
     key, title, content = DEFAULT_SECTIONS[index]
@@ -165,9 +168,10 @@ def migrate_stored_news(db: Session) -> int:
 def seed(db: Session) -> None:
     if not db.query(Admin).first():
         db.add(Admin(email=settings.admin_email, password_hash=hash_password(settings.admin_password)))
-    # Crea las secciones que falten (también en bases ya existentes), respetando el orden del seed
-    for index, (key, _, _) in enumerate(DEFAULT_SECTIONS):
-        if not db.get(Section, key):
+    # Las secciones iniciales se crean solo en una base nueva. En una base que ya tiene secciones no se vuelven a
+    # crear las que se borraron: un módulo eliminado no reaparece al reiniciar. Las obligatorias sí se recrean (abajo).
+    if db.query(Section).count() == 0:
+        for index in range(len(DEFAULT_SECTIONS)):
             _insert_default(db, index)
     db.commit()
     ensure_required_sections(db)

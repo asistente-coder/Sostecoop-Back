@@ -30,7 +30,7 @@ from ..security import (
     set_session_cookie,
     verify_password,
 )
-from ..seed import REQUIRED_KEYS, ensure_required_sections
+from ..seed import MAX_MODULES, REQUIRED_KEYS, ensure_required_sections
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"], dependencies=[Depends(csrf_protect)])
 UPLOADS = Path("uploads")
@@ -96,6 +96,13 @@ async def create_section(
         raise HTTPException(422, f"La clave «{data.key}» está reservada")
     if db.get(Section, data.key):
         raise HTTPException(409, "Ya existe una sección con esa clave")
+    modules = db.query(func.count(Section.key)).filter(Section.key.notin_(REQUIRED_KEYS)).scalar()
+    if modules >= MAX_MODULES:
+        raise HTTPException(
+            422,
+            f"Se alcanzó el máximo de {MAX_MODULES} módulos (no cuentan las secciones obligatorias: "
+            f"{', '.join(sorted(REQUIRED_KEYS))}). Elimina un módulo para poder crear otro.",
+        )
     position = data.position
     if position is None:
         position = (db.query(func.max(Section.position)).scalar() or 0) + 1

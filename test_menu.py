@@ -59,4 +59,54 @@ with TestClient(app, headers={"Origin": "http://localhost:3000"}) as c:
     antes = c.get("/api/admin/activity").json()["total"]
     c.put("/api/admin/sections/settings", json={"content": {"menu": menu(11)}})
     assert c.get("/api/admin/activity").json()["total"] == antes
+
+    # destinos duplicados: se rechazan con un mensaje que dice cuáles enlaces chocan
+    base = [
+        {"label": "Inicio", "anchor": "#inicio"},
+        {"label": "Nosotros", "anchor": "#nosotros"},
+        {"label": "Noticias", "anchor": "#noticias"},
+        {"label": "Contacto", "anchor": "#contacto"},
+    ]
+
+    def guardar(menu_):
+        return c.put("/api/admin/sections/settings", json={"content": {"menu": menu_}})
+
+    assert guardar(base).status_code == 200
+    for repetido in (
+        {"label": "Quiénes somos", "anchor": "#nosotros"},
+        {"label": "Otro", "anchor": "  #NOSOTROS "},  # mayúsculas y espacios no esquivan la regla
+        {"label": "Catálogo", "anchor": "/noticias"},
+    ):
+        extra = (
+            [repetido, {"label": "Catálogo 2", "anchor": "/noticias/"}]
+            if repetido["anchor"] == "/noticias"
+            else [repetido]
+        )
+        r = guardar(base + extra)
+        assert r.status_code == 422, (repetido, r.text)
+        detail = r.json()["detail"]
+        assert "repetido" in detail and "enlace" in detail and "una vez" in detail, detail
+    detalle = guardar(base + [{"label": "Quiénes somos", "anchor": "#nosotros"}]).json()["detail"]
+    assert (
+        "«#nosotros»" in detalle and "enlace 2 («Nosotros»)" in detalle and "enlace 5 («Quiénes somos»)" in detalle
+    ), detalle
+    assert [
+        i["anchor"]
+        for i in next(s for s in c.get("/api/admin/sections").json() if s["key"] == "settings")["content"]["menu"]
+    ] == ["#inicio", "#nosotros", "#noticias", "#contacto"]  # lo rechazado no se guardó
+
+    # destinos distintos sí se aceptan (también externos), y los enlaces sin destino no cuentan como repetidos
+    distintos = base + [{"label": "Web", "anchor": "https://ejemplo.com"}, {"label": "Catálogo", "anchor": "/noticias"}]
+    assert guardar(distintos).status_code == 200
+    assert (
+        guardar(base + [{"label": "A", "anchor": ""}, {"label": "B", "anchor": ""}, {"label": "C"}]).status_code == 200
+    )
+    assert guardar(base + ["texto"]).status_code == 422  # un enlace debe ser un objeto
+
+    # el máximo de 10 sigue valiendo, y se revisa antes que los duplicados
+    diez = [{"label": f"E{i}", "anchor": f"#e{i}"} for i in range(10)]
+    assert guardar(diez).status_code == 200
+    r = guardar(diez + [{"label": "E0", "anchor": "#e0"}])
+    assert r.status_code == 422 and "máximo 10" in r.json()["detail"]
+    assert guardar(base).status_code == 200
 print("MENU OK")

@@ -145,7 +145,7 @@ Cada archivo se ejecuta solo y debe terminar con su mensaje de OK. Usan una base
 $env:DATABASE_URL = "sqlite:///./test_tmp.db"
 python test_smoke.py; python test_activity.py; python test_cookie.py
 python test_sections.py; python test_required.py; python test_news.py
-python test_menu.py; python test_news_rules.py; python test_news_categories.py
+python test_menu.py; python test_news_rules.py; python test_news_categories.py; python test_modules.py
 Remove-Item test_tmp.db
 Remove-Item Env:DATABASE_URL    # vuelve a usar la base del .env
 ```
@@ -168,6 +168,7 @@ app/
   realtime.py    reparte los cambios a los WebSockets
   seed.py        secciones iniciales y secciones obligatorias
 crear_admin.py                crea un administrador o cambia su contraseña
+eliminar_modulos.py           elimina módulos (y sus enlaces del menú) de la base configurada
 migrar_sqlite_a_postgres.py   pasa los datos de SQLite a PostgreSQL
 ```
 
@@ -200,6 +201,9 @@ Las secciones iniciales (`app/seed.py`) son: `settings`, `hero`, `nosotros`, `se
 
 **Obligatorias:** `settings`, `hero`, `nosotros`, `noticias` y `contacto` no se pueden borrar ni ocultar (`403`), y si faltan
 en la base se recrean solas al listar o al pedir el contenido público.
+
+**Las secciones iniciales se crean solo en una base nueva.** Al reiniciar el servidor no se vuelven a crear los módulos que se
+eliminaron (por ejemplo `faq`); lo único que se recrea siempre son las obligatorias.
 
 ### Sección «noticias»
 
@@ -263,18 +267,40 @@ datos: las noticias siguen guardadas en el JSON de la sección `noticias`.
 
 ### Menú de «settings»
 
-`settings.content.menu` es la lista de enlaces del menú de la página y admite **como máximo 10**. La regla se aplica en el
+`settings.content.menu` es la lista de enlaces del menú de la página y admite **como máximo 10**, sin destinos repetidos. La regla se aplica en el
 backend (`app/menu.py`), así que vale también para peticiones directas a la API, sin pasar por el frontend:
 
 - `PUT /api/admin/sections/settings` con más de 10 enlaces → **422** `{"detail": "El menú admite como máximo 10 enlaces y se enviaron 11. Quita 1 para poder guardar."}`.
 - Si `menu` no es una lista → **422** `settings.menu debe ser una lista de enlaces`.
 - Un guardado rechazado no cambia nada: no se guarda, no se anuncia por WebSocket y no se registra en la actividad.
+- **Un destino no puede repetirse:** dos enlaces con el mismo `anchor` dan **422** `El menú tiene el destino «#nosotros» repetido: enlace 2 («Nosotros») y enlace 5 («Quiénes somos»)...`.
+  Al comparar se ignoran mayúsculas, espacios y la `/` final (`/noticias/` = `/noticias`). Los enlaces sin `anchor` no cuentan como repetidos,
+  y un enlace que no es un objeto da 422.
 - Si el contenido no trae `menu`, no hay nada que validar. El límite está en `MAX_MENU_ITEMS` (`app/menu.py`).
 
 ### Crear y borrar módulos (admin)
 
+**Máximo de 7 módulos.** Un módulo es cualquier sección que no sea obligatoria: las obligatorias (`settings`, `hero`, `nosotros`,
+`noticias` y `contacto`) no cuentan. Con 7 módulos, `POST /api/admin/sections` responde **422** `Se alcanzó el máximo de 7 módulos...`;
+hay que eliminar uno para poder crear otro. El límite está en `MAX_MODULES` (`app/seed.py`) y cuenta también los módulos ocultos.
+
 - `POST /api/admin/sections` `{key, title, visible?, position?, content?}` → 201. `key` = `^[a-z0-9-]{2,40}$`; 409 si existe; 422 si el formato es inválido o la clave es reservada (`settings, hero, nosotros, noticias, contacto, inicio, admin`). Sin `position`, va al final. Emite `section_updated`.
 - `DELETE /api/admin/sections/{key}` → 204; 403 para las obligatorias; 404 si no existe. Emite `{"event":"section_deleted","data":{"key":"..."}}`.
+
+### Eliminar varios módulos de una vez (`eliminar_modulos.py`)
+
+Para limpiar una base que tiene demasiados módulos. Elimina **solo** estos cinco, por su título: Canales digitales, Seguridad digital,
+Convenios para asociados, Bienestar cooperativo y Participación cooperativa. Antes de borrarlos quita del menú sus enlaces, y nunca toca
+las secciones obligatorias, los demás módulos ni las demás entradas del menú. Los módulos que no existan se ignoran, así que se puede
+repetir. Usa la base de `DATABASE_URL` del `.env`, con el entorno virtual activado:
+
+```powershell
+python eliminar_modulos.py            # simulación: muestra qué haría y no cambia nada
+python eliminar_modulos.py --aplicar  # lo hace (guarda antes un respaldo en backups/ y pide confirmar escribiendo SI)
+```
+
+Cada módulo borrado y el cambio del menú quedan en la actividad (`section_delete` y `section_update`). Para que un módulo eliminado
+no reaparezca, ver «Las secciones iniciales se crean solo en una base nueva».
 
 ## Actividad del admin
 
