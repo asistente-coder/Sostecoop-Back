@@ -60,6 +60,7 @@ Después se edita el `.env` y se reinicia el servidor. El `.env` no se sube a Gi
 | `DATABASE_URL` | Por defecto `postgresql+psycopg://postgres:postgres@localhost:5432/cooperativa`. Para pruebas rápidas sin PostgreSQL: `sqlite:///./cooperativa.db` |
 | `CORS_ORIGINS` | Orígenes del frontend permitidos, separados por coma y escritos uno a uno (`http://localhost:3000`, `http://localhost:5173`, ...) |
 | `TOKEN_MINUTES` | Duración de la sesión y de la cookie (480 = 8 h, fija desde el login) |
+| `NEWS_CREATED_AT_FALLBACK` | Opcional. Fecha ISO 8601 (`2026-10-01T00:00:00+00:00`) que se asigna como `created_at` a las noticias antiguas que no la tienen. Vacío = el momento de la migración |
 | `ENVIRONMENT` | `production` marca la cookie como `Secure` (solo viaja por HTTPS) |
 
 Después de cambiar el `.env`, reiniciar el servidor.
@@ -144,7 +145,7 @@ Cada archivo se ejecuta solo y debe terminar con su mensaje de OK. Usan una base
 $env:DATABASE_URL = "sqlite:///./test_tmp.db"
 python test_smoke.py; python test_activity.py; python test_cookie.py
 python test_sections.py; python test_required.py; python test_news.py
-python test_menu.py
+python test_menu.py; python test_news_rules.py
 Remove-Item test_tmp.db
 Remove-Item Env:DATABASE_URL    # vuelve a usar la base del .env
 ```
@@ -173,7 +174,8 @@ migrar_sqlite_a_postgres.py   pasa los datos de SQLite a PostgreSQL
 ## Endpoints
 
 Públicos:
-- `GET  /api/public/content` → lista de secciones visibles
+- `GET  /api/public/content` → lista de secciones visibles (en «noticias», solo las noticias activas)
+- `GET  /api/public/news/{slug}` → una noticia activa; `404` si no existe o está desactivada
 - `POST /api/public/contact` → `{name, email, phone?, message}`
 - `WS   /api/public/ws` → eventos en vivo
 
@@ -201,9 +203,42 @@ en la base se recrean solas al listar o al pedir el contenido público.
 
 ### Sección «noticias»
 
-`key = noticias`, con `content.items[]` (`slug`, `title`, `category`, `date`, `author`, `reading_minutes`, `summary`, `image_url`, `image_alt`, `body`).
-El `PUT /api/admin/sections/noticias` responde **422** si falta el `title`, si la `date` no es `AAAA-MM-DD` o si dos slugs se repiten.
-Si el `slug` viene vacío se genera desde el título (minúsculas, sin tildes, con guiones; si choca, se añade `-2`, `-3`...).
+`key = noticias`, con `content.items[]`. Cada noticia tiene `slug`, `title`, `category`, `date`, `author`, `reading_minutes`,
+`summary`, `image_url`, `image_alt`, `body` y tres campos que maneja el servidor:
+
+| Campo | Qué es |
+|-------|--------|
+| `id` | Identificador estable (texto de 32 caracteres) que asigna el servidor. Con él se reconoce cada noticia al guardar |
+| `created_at` | Fecha y hora UTC de creación (ISO 8601), puesta por el servidor. **Inmutable**: lo que mande el frontend se ignora |
+| `active` | `true` o `false`. Una noticia nueva siempre nace con `true` |
+
+El `PUT /api/admin/sections/noticias` recibe **la lista completa**: las noticias que ya existen, tal como llegaron (con su `id`),
+más las nuevas **sin** `id`. Responde **422** (`{"detail": "..."}`) en estos casos:
+
+- Falta el `title`, la `date` no es `AAAA-MM-DD` o dos slugs se repiten. Si el `slug` viene vacío se genera desde el título
+  (minúsculas, sin tildes, con guiones; si choca, se añade `-2`, `-3`...).
+- **No se puede borrar ni quitar una noticia de la lista.** Para ocultarla al público se desactiva con `active: false`.
+  Tampoco se puede borrar la sección (`DELETE` responde `403`).
+- Llega un `id` que no existe o repetido, o un `active` que no es booleano. Las noticias nuevas se envían sin `id`.
+- **Ventana de edición de 72 horas:** el contenido (todo menos `id`, `created_at` y `active`) solo se puede cambiar durante las
+  72 horas siguientes a `created_at`. Pasado ese plazo, cualquier cambio de contenido se rechaza. La `date` (fecha de publicación,
+  editable) **no** cuenta para el plazo. Reordenar la lista sí está permitido.
+- `active` se puede cambiar **en cualquier momento**, también después de las 72 horas: una noticia desactivada se puede reactivar.
+
+**Qué ve el público:** solo las noticias con `active: true`, tanto en `GET /api/public/content` como en
+`GET /api/public/news/{slug}` y en los mensajes `section_updated` del WebSocket. El panel de administración
+(`GET /api/admin/sections`) recibe todas, activas o no.
+
+**Bitácora:** al guardar noticias, `details.news` indica cuáles se crearon, editaron, activaron o desactivaron.
+
+#### Noticias existentes (migración)
+
+Al arrancar, el servidor completa `id`, `active` y `created_at` en las noticias que no los tengan (es idempotente: si ya los
+tienen, no cambia nada). Las noticias antiguas no guardan su fecha real de creación, y la `date` no se usa porque es editable,
+así que reciben `NEWS_CREATED_AT_FALLBACK` o, si no está definida, el momento de la migración. Eso significa que **esas noticias
+se pueden editar durante 72 horas contando desde la migración**. Para cerrarlas antes, se define `NEWS_CREATED_AT_FALLBACK` con
+una fecha anterior. La migración queda registrada en la actividad como `news_migration`. No cambia el esquema de la base de
+datos: las noticias siguen guardadas en el JSON de la sección `noticias`.
 
 ### Menú de «settings»
 

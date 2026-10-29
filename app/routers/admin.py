@@ -9,7 +9,7 @@ from ..activity import log_activity, section_changes, section_summary
 from ..database import get_db
 from ..models import ActivityLog, Admin, ContactMessage, Section
 from ..menu import validate_menu
-from ..news import validate_news
+from ..news import apply_news_rules, public_section
 from ..realtime import hub
 from ..schemas import (
     ActivityPage,
@@ -114,7 +114,7 @@ async def create_section(
     db.commit()
     db.refresh(section)
     await hub.broadcast(
-        {"event": "section_updated", "data": SectionOut.model_validate(section).model_dump(mode="json")}
+        {"event": "section_updated", "data": public_section(SectionOut.model_validate(section).model_dump(mode="json"))}
     )
     return section
 
@@ -157,19 +157,23 @@ async def update_section(
     changes = data.model_dump(exclude_unset=True)
     if key in REQUIRED_KEYS and changes.get("visible") is False:
         raise HTTPException(403, "Esta sección es obligatoria y no se puede ocultar")
+    news_summary: dict = {}
     if key == "noticias" and changes.get("content") is not None:
-        changes["content"] = validate_news(changes["content"])
+        changes["content"], news_summary = apply_news_rules(section.content or {}, changes["content"])
     if key == "settings" and changes.get("content") is not None:
         changes["content"] = validate_menu(changes["content"])
-    diff =section_changes(section, changes)  # antes de aplicar, para poder comparar
+    diff = section_changes(section, changes)  # antes de aplicar, para poder comparar
+    if diff and news_summary:
+        diff["news"] = news_summary  # qué noticias se crearon, editaron, activaron o desactivaron
     for field, value in changes.items():
         setattr(section, field, value)
     if diff:  # un guardado sin cambios reales no ensucia la bitácora
         log_activity(db, request, admin.email, "section_update", section_summary(key, diff), "section", key, diff)
     db.commit()
     db.refresh(section)
+    # Los visitantes reciben la sección sin las noticias desactivadas
     await hub.broadcast(
-        {"event": "section_updated", "data": SectionOut.model_validate(section).model_dump(mode="json")}
+        {"event": "section_updated", "data": public_section(SectionOut.model_validate(section).model_dump(mode="json"))}
     )
     return section
 

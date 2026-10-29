@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     # PostgreSQL local con la base "cooperativa" creada. Para otros datos de conexión, definir DATABASE_URL en el .env
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/cooperativa"
     token_minutes: int = 480
+    # Fecha de creación (ISO 8601, p. ej. 2026-10-01T00:00:00+00:00) para las noticias antiguas que no la tienen.
+    # Vacío = el momento en que se migran
+    news_created_at_fallback: str = ""
     # "production" activa el atributo Secure de la cookie de sesión (requiere HTTPS)
     environment: str = "development"
 

@@ -1,11 +1,15 @@
 import json
+import logging
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
 from .config import settings
-from .models import Admin, Section
+from .models import ActivityLog, Admin, Section
+from .news import migrate_content, news_fallback
 from .security import hash_password
+
+log = logging.getLogger("uvicorn.error")
 
 # Contenido inicial. Ajustar las llaves a lo que muestre el diseño de Figma.
 DEFAULT_SECTIONS = [
@@ -105,6 +109,8 @@ REQUIRED_KEYS = frozenset({"settings", "hero", "nosotros", "noticias", "contacto
 
 def _insert_default(db: Session, index: int) -> None:
     key, title, content = DEFAULT_SECTIONS[index]
+    if key == "noticias":  # las noticias nacen con id, active y created_at
+        content, _ = migrate_content(content, news_fallback(settings.news_created_at_fallback))
     db.query(Section).filter(Section.position >= index).update({Section.position: Section.position + 1})
     db.add(Section(key=key, title=title, content=content, position=index))
     db.flush()
@@ -128,6 +134,34 @@ def ensure_required_sections(db: Session) -> bool:
     return changed
 
 
+def migrate_stored_news(db: Session) -> int:
+    """Completa id, active y created_at en las noticias ya guardadas que no los tengan. Es idempotente.
+
+    Las noticias antiguas no guardan su fecha real de creación (`date` es la de publicación, editable), así que
+    reciben la fecha de NEWS_CREATED_AT_FALLBACK o, si no está definida, el momento de la migración.
+    """
+    section = db.get(Section, "noticias")
+    if section is None:
+        return 0
+    fallback = news_fallback(settings.news_created_at_fallback)
+    content, changed = migrate_content(section.content or {}, fallback)
+    if not changed:
+        return 0
+    section.content = content  # objeto nuevo, para que SQLAlchemy detecte el cambio del JSON
+    db.add(
+        ActivityLog(
+            action="news_migration",
+            entity_type="section",
+            entity_key="noticias",
+            summary=f"Migración: se completaron id, active y created_at en {changed} noticia(s)",
+            details={"news": changed, "created_at": fallback.isoformat(timespec="seconds")},
+        )
+    )
+    db.commit()
+    log.info("Noticias migradas: %s (created_at asignado: %s)", changed, fallback.isoformat(timespec="seconds"))
+    return changed
+
+
 def seed(db: Session) -> None:
     if not db.query(Admin).first():
         db.add(Admin(email=settings.admin_email, password_hash=hash_password(settings.admin_password)))
@@ -137,3 +171,4 @@ def seed(db: Session) -> None:
             _insert_default(db, index)
     db.commit()
     ensure_required_sections(db)
+    migrate_stored_news(db)
