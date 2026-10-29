@@ -144,6 +144,7 @@ Cada archivo se ejecuta solo y debe terminar con su mensaje de OK. Usan una base
 $env:DATABASE_URL = "sqlite:///./test_tmp.db"
 python test_smoke.py; python test_activity.py; python test_cookie.py
 python test_sections.py; python test_required.py; python test_news.py
+python test_menu.py
 Remove-Item test_tmp.db
 Remove-Item Env:DATABASE_URL    # vuelve a usar la base del .env
 ```
@@ -160,6 +161,7 @@ app/
   security.py    contraseñas, JWT, cookie de sesión y chequeo anti-CSRF
   activity.py    registro de la actividad del admin
   news.py        validación de la sección «noticias»
+  menu.py        validación del menú de «settings» (máximo de enlaces)
   routers/public.py   /api/public/*  (sin login + WebSocket)
   routers/admin.py    /api/admin/*   (cookie de sesión)
   realtime.py    reparte los cambios a los WebSockets
@@ -202,6 +204,16 @@ en la base se recrean solas al listar o al pedir el contenido público.
 `key = noticias`, con `content.items[]` (`slug`, `title`, `category`, `date`, `author`, `reading_minutes`, `summary`, `image_url`, `image_alt`, `body`).
 El `PUT /api/admin/sections/noticias` responde **422** si falta el `title`, si la `date` no es `AAAA-MM-DD` o si dos slugs se repiten.
 Si el `slug` viene vacío se genera desde el título (minúsculas, sin tildes, con guiones; si choca, se añade `-2`, `-3`...).
+
+### Menú de «settings»
+
+`settings.content.menu` es la lista de enlaces del menú de la página y admite **como máximo 10**. La regla se aplica en el
+backend (`app/menu.py`), así que vale también para peticiones directas a la API, sin pasar por el frontend:
+
+- `PUT /api/admin/sections/settings` con más de 10 enlaces → **422** `{"detail": "El menú admite como máximo 10 enlaces y se enviaron 11. Quita 1 para poder guardar."}`.
+- Si `menu` no es una lista → **422** `settings.menu debe ser una lista de enlaces`.
+- Un guardado rechazado no cambia nada: no se guarda, no se anuncia por WebSocket y no se registra en la actividad.
+- Si el contenido no trae `menu`, no hay nada que validar. El límite está en `MAX_MENU_ITEMS` (`app/menu.py`).
 
 ### Crear y borrar módulos (admin)
 

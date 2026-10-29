@@ -21,7 +21,12 @@ with TestClient(app, headers={"Origin": "http://localhost:3000"}) as c:
     assert "mal-secreto" not in str(page)
     assert page["items"][0]["admin_email"] == CRED["email"] and page["items"][0]["ip"]
 
-    antes = c.get("/api/admin/activity").json()["total"]
+    # los conteos son relativos: la base puede traer registros de otras pruebas
+    def total(query=""):
+        return c.get(f"/api/admin/activity?{query}").json()["total"]
+
+    hero_antes = total("entity_type=section&entity_key=hero")
+    logout_antes = total("action=logout")
 
     # editar: antes/después en title y solo nombres de campo en content
     sec = c.get("/api/admin/sections").json()
@@ -36,14 +41,14 @@ with TestClient(app, headers={"Origin": "http://localhost:3000"}) as c:
     assert "hero" in last["summary"] and "contenido (title)" in last["summary"]
 
     # guardar lo mismo no registra nada
-    total = c.get("/api/admin/activity").json()["total"]
+    registros = total()
     c.put("/api/admin/sections/hero", json={"title": "Hero nuevo", "content": nuevo})
-    assert c.get("/api/admin/activity").json()["total"] == total
+    assert total() == registros
 
     # un rechazo (403) tampoco deja registro
     assert c.put("/api/admin/sections/hero", json={"visible": False}).status_code == 403
     assert c.delete("/api/admin/sections/hero").status_code == 403
-    assert c.get("/api/admin/activity").json()["total"] == total
+    assert total() == registros
 
     # crear, borrar, subir
     body = {"key": "modulo-log", "title": "Modulo", "content": {"items": []}}
@@ -58,14 +63,16 @@ with TestClient(app, headers={"Origin": "http://localhost:3000"}) as c:
     # contactos: leer dos veces registra una sola vez
     c.post("/api/public/contact", json={"name": "Ana", "email": "ana@x.com", "message": "Hola, quiero info"})
     cid = c.get("/api/admin/contacts").json()[0]["id"]
+    leer = f"action=contact_read&entity_key={cid}"
+    leidos_antes = total(leer)
     c.patch(f"/api/admin/contacts/{cid}/read")
     c.patch(f"/api/admin/contacts/{cid}/read")
-    assert c.get(f"/api/admin/activity?action=contact_read&entity_key={cid}").json()["total"] == 1
+    assert total(leer) == leidos_antes + 1  # la segunda lectura no genera otro registro
     assert c.delete(f"/api/admin/contacts/{cid}").status_code == 204
     assert c.get("/api/admin/activity?action=contact_delete").json()["items"][0]["details"]["name"] == "Ana"
 
     # filtros y paginación
-    assert c.get("/api/admin/activity?entity_type=section&entity_key=hero").json()["total"] == 1
+    assert total("entity_type=section&entity_key=hero") == hero_antes + 1  # solo la edición válida
     p1 = c.get("/api/admin/activity?limit=2&offset=0").json()
     p2 = c.get("/api/admin/activity?limit=2&offset=2").json()
     assert len(p1["items"]) == 2 and p1["total"] == p2["total"]
@@ -79,5 +86,5 @@ with TestClient(app, headers={"Origin": "http://localhost:3000"}) as c:
     assert c.post("/api/admin/logout").status_code == 204
     assert c.get("/api/admin/activity").status_code == 401
     c.post("/api/admin/login", json=CRED)
-    assert c.get("/api/admin/activity?action=logout").json()["total"] == 1
+    assert total("action=logout") == logout_antes + 1
 print("ACTIVIDAD OK")

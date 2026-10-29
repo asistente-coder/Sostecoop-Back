@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..activity import log_activity, section_changes, section_summary
 from ..database import get_db
 from ..models import ActivityLog, Admin, ContactMessage, Section
+from ..menu import validate_menu
 from ..news import validate_news
 from ..realtime import hub
 from ..schemas import (
@@ -158,7 +159,9 @@ async def update_section(
         raise HTTPException(403, "Esta sección es obligatoria y no se puede ocultar")
     if key == "noticias" and changes.get("content") is not None:
         changes["content"] = validate_news(changes["content"])
-    diff = section_changes(section, changes)  # antes de aplicar, para poder comparar
+    if key == "settings" and changes.get("content") is not None:
+        changes["content"] = validate_menu(changes["content"])
+    diff =section_changes(section, changes)  # antes de aplicar, para poder comparar
     for field, value in changes.items():
         setattr(section, field, value)
     if diff:  # un guardado sin cambios reales no ensucia la bitácora
