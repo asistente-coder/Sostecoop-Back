@@ -145,7 +145,7 @@ Cada archivo se ejecuta solo y debe terminar con su mensaje de OK. Usan una base
 $env:DATABASE_URL = "sqlite:///./test_tmp.db"
 python test_smoke.py; python test_activity.py; python test_cookie.py
 python test_sections.py; python test_required.py; python test_news.py
-python test_menu.py; python test_news_rules.py
+python test_menu.py; python test_news_rules.py; python test_news_categories.py
 Remove-Item test_tmp.db
 Remove-Item Env:DATABASE_URL    # vuelve a usar la base del .env
 ```
@@ -224,6 +224,27 @@ más las nuevas **sin** `id`. Responde **422** (`{"detail": "..."}`) en estos ca
   72 horas siguientes a `created_at`. Pasado ese plazo, cualquier cambio de contenido se rechaza. La `date` (fecha de publicación,
   editable) **no** cuenta para el plazo. Reordenar la lista sí está permitido.
 - `active` se puede cambiar **en cualquier momento**, también después de las 72 horas: una noticia desactivada se puede reactivar.
+
+#### Categorías de las noticias
+
+`content.categories` es la lista de categorías disponibles, como lista de textos. Viaja en el mismo contenido de la sección, así
+que se guarda con `PUT /api/admin/sections/noticias` y se devuelve en `GET /api/admin/sections`, en `GET /api/public/content` y en
+los mensajes del WebSocket; no hay endpoints aparte. Cada noticia conserva su propio `category` (texto).
+
+- Cada categoría debe ser un texto no vacío de **máximo 40 caracteres**. Se guardan sin espacios al inicio ni al final.
+- **No puede haber repetidas**: al comparar se ignoran mayúsculas y espacios (`Ahorro`, ` ahorro ` y `AHORRO` son la misma).
+  Las tildes sí cuentan (`Crédito` y `Credito` son distintas).
+- Si el guardado **no trae** `categories` (o trae `null`), se conservan las que ya estaban: guardar otros campos no las borra.
+  Enviar `[]` las quita todas, siempre que ninguna esté en uso.
+- **No se puede eliminar una categoría que alguna noticia usa** (activa, desactivada o ya cerrada): 422 con el nombre de la
+  categoría y de las noticias que la usan. Se evalúa el estado final de la petición, así que se puede reasignar una noticia y
+  quitar la categoría en el mismo guardado. Una noticia cerrada (más de 72 horas) no puede cambiar de categoría.
+- Una categoría nueva queda disponible para las noticias apenas se guarda, incluso en la misma petición que crea la noticia.
+- El `category` de una noticia es texto libre: el servidor no exige que esté en la lista.
+- Mensajes de error: `noticias.categories debe ser una lista de textos`, `Categoría 2: no puede estar vacía`,
+  `Categoría 2: «…» tiene 41 caracteres (máximo 40)`, `Categoría 3: «ahorro» está repetida…` y
+  `No se puede eliminar la categoría «X»: la usan 2 noticia(s) (…)`.
+- La bitácora registra en `details.news` las categorías agregadas y quitadas (`categories_added`, `categories_removed`).
 
 **Qué ve el público:** solo las noticias con `active: true`, tanto en `GET /api/public/content` como en
 `GET /api/public/news/{slug}` y en los mensajes `section_updated` del WebSocket. El panel de administración

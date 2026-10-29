@@ -133,6 +133,51 @@ def news_fallback(configured: str) -> datetime:
     return parsed
 
 
+MAX_CATEGORY_LENGTH = 40
+
+
+def _norm(text) -> str:
+    """Forma en que se comparan las categorías: sin mayúsculas y sin espacios de más."""
+    return " ".join(str(text or "").split()).casefold()
+
+
+def validate_categories(value) -> list[str]:
+    """`content.categories`: lista de textos no vacíos, de máximo 40 caracteres y sin repetidos."""
+    if not isinstance(value, list):
+        _fail("noticias.categories debe ser una lista de textos")
+    cleaned: list[str] = []
+    seen: dict[str, str] = {}
+    for n, raw in enumerate(value, start=1):
+        if not isinstance(raw, str):
+            _fail(f"Categoría {n}: debe ser un texto")
+        name = raw.strip()
+        if not name:
+            _fail(f"Categoría {n}: no puede estar vacía")
+        if len(name) > MAX_CATEGORY_LENGTH:
+            _fail(f"Categoría {n}: «{name[:20]}…» tiene {len(name)} caracteres (máximo {MAX_CATEGORY_LENGTH})")
+        key = _norm(name)
+        if key in seen:
+            _fail(f"Categoría {n}: «{name}» está repetida; ya existe «{seen[key]}» (se ignoran mayúsculas/espacios)")
+        seen[key] = name
+        cleaned.append(name)
+    return cleaned
+
+
+def check_categories_in_use(old_categories: list[str], new_categories: list[str], items: list[dict]) -> None:
+    """Rechaza quitar una categoría que todavía tiene noticias asignadas (cuenta el estado final de las noticias)."""
+    kept = {_norm(name) for name in new_categories}
+    for name in old_categories:
+        if _norm(name) in kept:
+            continue
+        users = [_title(item) for item in items if _norm(item.get("category")) == _norm(name)]
+        if users:
+            shown = ", ".join(f"«{title}»" for title in users[:3]) + ("…" if len(users) > 3 else "")
+            _fail(
+                f"No se puede eliminar la categoría «{name}»: la usan {len(users)} noticia(s) ({shown}). "
+                "Cambia la categoría de esas noticias antes de eliminarla"
+            )
+
+
 def apply_news_rules(old: dict, new: dict, now: datetime | None = None) -> tuple[dict, dict]:
     """Reglas del servidor para guardar la sección «noticias». Devuelve (contenido, resumen de cambios).
 
@@ -141,6 +186,8 @@ def apply_news_rules(old: dict, new: dict, now: datetime | None = None) -> tuple
     - `created_at` es inmutable: se ignora lo que mande el cliente.
     - Ninguna noticia se puede quitar de la lista (hay que desactivarla con `active`).
     - `active` se puede cambiar siempre. El resto del contenido, solo durante 72 h desde `created_at`.
+    - `content.categories` se valida y se conserva: si no llega en la petición se mantiene la guardada, y no se puede
+      quitar una categoría que alguna noticia siga usando.
     """
     now = now or utc_now()
     new_items = new.get("items", [])
@@ -185,7 +232,28 @@ def apply_news_rules(old: dict, new: dict, now: datetime | None = None) -> tuple
 
     validate_news(new)
 
-    summary: dict[str, list[str]] = {"created": [], "edited": [], "activated": [], "deactivated": []}
+    stored_categories = old.get("categories")
+    old_categories = [c for c in stored_categories if isinstance(c, str)] if isinstance(stored_categories, list) else []
+    if new.get("categories") is not None:
+        new["categories"] = validate_categories(new["categories"])
+        check_categories_in_use(old_categories, new["categories"], new_items)
+    elif "categories" in old:
+        new["categories"] = copy.deepcopy(old["categories"])  # guardar sin enviarlas no las borra
+    else:
+        new.pop("categories", None)
+
+    summary: dict[str, list[str]] = {
+        "created": [],
+        "edited": [],
+        "activated": [],
+        "deactivated": [],
+        "categories_added": [],
+        "categories_removed": [],
+    }
+    before = {_norm(c): c for c in old_categories}
+    after = {_norm(c): c for c in new.get("categories", []) if isinstance(c, str)}
+    summary["categories_added"] = [name for key, name in after.items() if key not in before]
+    summary["categories_removed"] = [name for key, name in before.items() if key not in after]
     for item in new_items:
         stored = old_by_id.get(item["id"])
         if stored is None:
